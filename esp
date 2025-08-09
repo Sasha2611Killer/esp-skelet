@@ -1,3 +1,5 @@
+local ESP = {}
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local camera = workspace.CurrentCamera
@@ -210,7 +212,7 @@ local function trackPlayer(plr)
 end
 
 -- Включение/выключение ESP
-local function toggleESP(state)
+function ESP:Toggle(state)
     ESP_SETTINGS.Enabled = state
     for plr, skeleton in pairs(skeletons) do
         updateSkeleton(plr, skeleton)
@@ -218,7 +220,7 @@ local function toggleESP(state)
 end
 
 -- Включение/выключение круга головы
-local function toggleHeadCircle(state)
+function ESP:ToggleHeadCircle(state)
     ESP_SETTINGS.HeadCircle = state
     for plr, skeleton in pairs(skeletons) do
         updateSkeleton(plr, skeleton)
@@ -236,7 +238,21 @@ for _, plr in ipairs(Players:GetPlayers()) do
     trackPlayer(plr)
 end
 
--- Пример использования:
--- toggleESP(true)        -- Включить ESP
--- toggleESP(false)       -- Выключить ESP
--- toggleHeadCircle(true) -- Включить круги вокруг голов
+-- Добавляем метатаблицу для ESP.Enabled
+setmetatable(ESP, {
+    __index = function(t, k)
+        if k == "Enabled" then
+            return ESP_SETTINGS.Enabled
+        end
+    end,
+    __newindex = function(t, k, v)
+        if k == "Enabled" then
+            ESP_SETTINGS.Enabled = v
+            for plr, skeleton in pairs(skeletons) do
+                updateSkeleton(plr, skeleton)
+            end
+        end
+    end
+})
+
+return ESP
