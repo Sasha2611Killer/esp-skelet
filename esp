@@ -32,6 +32,28 @@ local ESP_SETTINGS = {
             TeamCheck = false,
             VisibleOnly = true,
             FillTransparency = 1
+        },
+        HealthBar = {
+            Enabled = false,
+            Color = Color3.new(0, 1, 0),
+            BackgroundColor = Color3.new(1, 0, 0),
+            Size = Vector2.new(2, 10),
+            Offset = Vector3.new(3, 0, 0),
+            VisibleOnly = true
+        },
+        Tracer = {
+            Enabled = false,
+            Color = Color3.new(1, 1, 1),
+            Thickness = 1,
+            TeamCheck = false,
+            Origin = "Bottom" -- "Bottom", "Middle", or "Top"
+        },
+        Chams = {
+            Enabled = false,
+            Color = Color3.new(1, 0, 0),
+            Transparency = 0.5,
+            VisibleOnly = true,
+            TeamCheck = false
         }
     }
 }
@@ -114,7 +136,7 @@ local function Draw3DLine(from, to, color, thickness, parentGui)
     part.Size = Vector3.new(thickness, thickness, (from - to).Magnitude)
     part.CFrame = CFrame.new((from + to)/2, to)
     part.Color = color
-    
+
     local boxHandleAdornment = Instance.new("BoxHandleAdornment")
     boxHandleAdornment.Adornee = part
     boxHandleAdornment.AlwaysOnTop = true
@@ -123,18 +145,18 @@ local function Draw3DLine(from, to, color, thickness, parentGui)
     boxHandleAdornment.Color3 = color
     boxHandleAdornment.Transparency = 0
     boxHandleAdornment.Parent = parentGui
-    
+
     return {Part = part, Adornment = boxHandleAdornment}
 end
 
-local function Draw3DText(text, position, color, size, parentGui)
+local function Draw3DText(text, position, color, size, outline, outlineColor, parentGui)
     local billboard = Instance.new("BillboardGui")
     billboard.AlwaysOnTop = true
     billboard.Size = UDim2.new(0, 200, 0, 50)
     billboard.StudsOffset = position
     billboard.Adornee = parentGui
     billboard.Parent = parentGui
-    
+
     local textLabel = Instance.new("TextLabel")
     textLabel.BackgroundTransparency = 1
     textLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -142,31 +164,96 @@ local function Draw3DText(text, position, color, size, parentGui)
     textLabel.TextColor3 = color
     textLabel.TextSize = size
     textLabel.Font = Enum.Font.SourceSansBold
-    textLabel.TextStrokeTransparency = 0
-    textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    textLabel.TextStrokeTransparency = outline and 0 or 1
+    textLabel.TextStrokeColor3 = outlineColor or Color3.new(0, 0, 0)
     textLabel.Parent = billboard
-    
+
     return billboard
+end
+
+local function DrawHealthBar(position, healthPercent, size, color, bgColor, parentGui)
+    local background = Instance.new("BillboardGui")
+    background.AlwaysOnTop = true
+    background.Size = UDim2.new(0, size.X + 2, 0, size.Y + 2)
+    background.StudsOffset = position + Vector3.new(0, size.Y/2, 0)
+    background.Adornee = parentGui
+    background.Parent = parentGui
+
+    local bgFrame = Instance.new("Frame")
+    bgFrame.Size = UDim2.new(1, 0, 1, 0)
+    bgFrame.BackgroundColor3 = bgColor
+    bgFrame.BorderSizePixel = 0
+    bgFrame.Parent = background
+
+    local healthFrame = Instance.new("Frame")
+    healthFrame.Size = UDim2.new(1, -2, healthPercent, -2)
+    healthFrame.Position = UDim2.new(0, 1, 1 - healthPercent, 1)
+    healthFrame.BackgroundColor3 = color
+    healthFrame.BorderSizePixel = 0
+    healthFrame.Parent = background
+
+    return background
+end
+
+local function DrawTracer(rootPart, color, thickness, origin, parentGui)
+    local originPosition
+    if origin == "Bottom" then
+        originPosition = Vector3.new(0, -10, 0)
+    elseif origin == "Middle" then
+        originPosition = Vector3.new(0, 0, 0)
+    else -- Top
+        originPosition = Vector3.new(0, 10, 0)
+    end
+    
+    local screenPoint = Camera:WorldToViewportPoint(rootPart.Position)
+    local line = Drawing.new("Line")
+    line.From = Vector2.new(Camera.ViewportSize.X/2, origin == "Middle" and Camera.ViewportSize.Y/2 or Camera.ViewportSize.Y)
+    line.To = Vector2.new(screenPoint.X, screenPoint.Y)
+    line.Color = color
+    line.Thickness = thickness
+    line.Visible = true
+    
+    return line
+end
+
+local function ApplyChams(character, color, transparency, parentGui)
+    local highlight = Instance.new("Highlight")
+    highlight.FillColor = color
+    highlight.FillTransparency = transparency
+    highlight.OutlineColor = color
+    highlight.OutlineTransparency = 0
+    highlight.Adornee = character
+    highlight.Parent = parentGui
+    
+    return highlight
 end
 
 -- Update functions
 local function UpdateSkeleton(plr, skeleton)
     if not ESP_SETTINGS.Enabled then
-        for _, obj in pairs(skeleton) do
+        for _, obj in pairs(skeleton.Drawing or {}) do
             if obj.Adornment then obj.Adornment:Destroy() end
             if obj.Part then obj.Part:Destroy() end
             if obj.Billboard then obj.Billboard:Destroy() end
+            if obj.HealthBar then obj.HealthBar:Destroy() end
+            if obj.Tracer then obj.Tracer:Remove() end
+            if obj.Highlight then obj.Highlight:Destroy() end
         end
+        skeleton.Drawing = {}
         return
     end
 
     local character = plr.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then
-        for _, obj in pairs(skeleton) do
+        for _, obj in pairs(skeleton.Drawing or {}) do
             if obj.Adornment then obj.Adornment:Destroy() end
             if obj.Part then obj.Part:Destroy() end
             if obj.Billboard then obj.Billboard:Destroy() end
+            if obj.HealthBar then obj.HealthBar:Destroy() end
+            if obj.Tracer then obj.Tracer:Remove() end
+            if obj.Highlight then obj.Highlight:Destroy() end
         end
+        skeleton.Drawing = {}
         return
     end
 
@@ -181,10 +268,13 @@ local function UpdateSkeleton(plr, skeleton)
     end
 
     -- Clear old drawings
-    for _, obj in pairs(skeleton) do
+    for _, obj in pairs(skeleton.Drawing or {}) do
         if obj.Adornment then obj.Adornment:Destroy() end
         if obj.Part then obj.Part:Destroy() end
         if obj.Billboard then obj.Billboard:Destroy() end
+        if obj.HealthBar then obj.HealthBar:Destroy() end
+        if obj.Tracer then obj.Tracer:Remove() end
+        if obj.Highlight then obj.Highlight:Destroy() end
     end
     skeleton.Drawing = {}
 
@@ -212,8 +302,8 @@ local function UpdateSkeleton(plr, skeleton)
 
             if jointA and jointB then
                 local visible = not ESP_SETTINGS.Components.Skeleton.VisibleOnly or 
-                               (IsPartVisible(jointA, character) and IsPartVisible(jointB, character))
-                
+                    (IsPartVisible(jointA, character) and IsPartVisible(jointB, character))
+
                 if visible then
                     local line = Draw3DLine(
                         jointA.Position,
@@ -233,7 +323,7 @@ local function UpdateSkeleton(plr, skeleton)
         local rootPart = character:FindFirstChild("HumanoidRootPart")
         if rootPart then
             local visible = not ESP_SETTINGS.Components.Box.VisibleOnly or IsPartVisible(rootPart, character)
-            
+
             if visible then
                 local torsoName = humanoid.RigType == Enum.HumanoidRigType.R15 and "UpperTorso" or "Torso"
                 local torso = character:FindFirstChild(torsoName)
@@ -290,7 +380,7 @@ local function UpdateSkeleton(plr, skeleton)
         local head = character:FindFirstChild("Head")
         if head then
             local visible = not ESP_SETTINGS.Components.Name.VisibleOnly or IsPartVisible(head, character)
-            
+
             if visible then
                 local distanceText = ""
                 if ESP_SETTINGS.Components.Name.ShowDistance then
@@ -300,17 +390,70 @@ local function UpdateSkeleton(plr, skeleton)
 
                 local textPos = ESP_SETTINGS.Components.Name.Offset
                 local offset = head.CFrame:VectorToWorldSpace(textPos)
-                
+
                 local billboard = Draw3DText(
                     plr.Name .. distanceText,
                     textPos,
                     GetPlayerColor(plr, "Name"),
                     ESP_SETTINGS.Components.Name.Size,
+                    ESP_SETTINGS.Components.Name.Outline,
+                    ESP_SETTINGS.Components.Name.OutlineColor,
                     skeleton.ParentGui
                 )
-                
+
                 table.insert(skeleton.Drawing, {Billboard = billboard})
             end
+        end
+    end
+
+    -- Health bar
+    if ESP_SETTINGS.Components.HealthBar.Enabled then
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            local visible = not ESP_SETTINGS.Components.HealthBar.VisibleOnly or IsPartVisible(rootPart, character)
+            
+            if visible then
+                local healthPercent = humanoid.Health / humanoid.MaxHealth
+                local healthBar = DrawHealthBar(
+                    ESP_SETTINGS.Components.HealthBar.Offset,
+                    healthPercent,
+                    ESP_SETTINGS.Components.HealthBar.Size,
+                    ESP_SETTINGS.Components.HealthBar.Color,
+                    ESP_SETTINGS.Components.HealthBar.BackgroundColor,
+                    skeleton.ParentGui
+                )
+                table.insert(skeleton.Drawing, {HealthBar = healthBar})
+            end
+        end
+    end
+
+    -- Tracer
+    if ESP_SETTINGS.Components.Tracer.Enabled then
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart then
+            local tracer = DrawTracer(
+                rootPart,
+                GetPlayerColor(plr, "Tracer"),
+                ESP_SETTINGS.Components.Tracer.Thickness,
+                ESP_SETTINGS.Components.Tracer.Origin,
+                skeleton.ParentGui
+            )
+            table.insert(skeleton.Drawing, {Tracer = tracer})
+        end
+    end
+
+    -- Chams
+    if ESP_SETTINGS.Components.Chams.Enabled then
+        local visible = not ESP_SETTINGS.Components.Chams.VisibleOnly or IsPartVisible(character:FindFirstChild("Head") or IsPartVisible(character:FindFirstChild("HumanoidRootPart"), character)
+        
+        if visible then
+            local highlight = ApplyChams(
+                character,
+                GetPlayerColor(plr, "Chams"),
+                ESP_SETTINGS.Components.Chams.Transparency,
+                skeleton.ParentGui
+            )
+            table.insert(skeleton.Drawing, {Highlight = highlight})
         end
     end
 end
@@ -361,6 +504,21 @@ function ESP:ToggleBox(state)
     self:UpdateAll()
 end
 
+function ESP:ToggleHealthBar(state)
+    ESP_SETTINGS.Components.HealthBar.Enabled = state
+    self:UpdateAll()
+end
+
+function ESP:ToggleTracer(state)
+    ESP_SETTINGS.Components.Tracer.Enabled = state
+    self:UpdateAll()
+end
+
+function ESP:ToggleChams(state)
+    ESP_SETTINGS.Components.Chams.Enabled = state
+    self:UpdateAll()
+end
+
 function ESP:SetSkeletonColor(color)
     ESP_SETTINGS.Components.Skeleton.Color = color
     self:UpdateAll()
@@ -373,6 +531,21 @@ end
 
 function ESP:SetBoxColor(color)
     ESP_SETTINGS.Components.Box.Color = color
+    self:UpdateAll()
+end
+
+function ESP:SetHealthBarColor(color)
+    ESP_SETTINGS.Components.HealthBar.Color = color
+    self:UpdateAll()
+end
+
+function ESP:SetTracerColor(color)
+    ESP_SETTINGS.Components.Tracer.Color = color
+    self:UpdateAll()
+end
+
+function ESP:SetChamsColor(color)
+    ESP_SETTINGS.Components.Chams.Color = color
     self:UpdateAll()
 end
 
