@@ -1,68 +1,33 @@
-local ESP = {
-    Settings = {
-        BoxOutlineColor = Color3.new(0, 0, 0),
-        BoxColor = Color3.new(1, 1, 1),
-        NameColor = Color3.new(1, 1, 1),
-        HealthOutlineColor = Color3.new(0, 0, 0),
-        HealthHighColor = Color3.new(0, 1, 0),
-        HealthLowColor = Color3.new(1, 0, 0),
-        CharSize = Vector2.new(4, 6),
-        Teamcheck = false,
-        WallCheck = false,
-        Enabled = false,
-        ShowBox = false,
-        BoxType = "2D",
-        ShowName = false,
-        ShowHealth = false,
-        ShowDistance = false,
-        ShowSkeletons = false,
-        ShowTracer = false,
-        TracerColor = Color3.new(1, 1, 1), 
-        TracerThickness = 2,
-        SkeletonsColor = Color3.new(1, 1, 1),
-        TracerPosition = "Bottom",
-    },
-    
-    Players = game:GetService("Players"),
-    RunService = game:GetService("RunService"),
-    camera = workspace.CurrentCamera,
-    cache = {}
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local camera = workspace.CurrentCamera
+
+local ESP_SETTINGS = {
+    Enabled = false,               -- Включен ли ESP
+    Color = Color3.new(0, 1, 0),  -- Зеленый цвет
+    Thickness = 2,                -- Толщина линий
+    TeamCheck = true,             -- Проверка команд
+    VisibleOnly = false,          -- Всегда показывать
+    HeadCircle = true,            -- Показывать круг вокруг головы
+    HeadCircleBaseRadius = 15,    -- Базовый радиус на близком расстоянии
+    HeadCircleMinRadius = 3,      -- Минимальный радиус на дальнем расстоянии
+    HeadCircleMaxDistance = 100,  -- Дистанция, после которой радиус не уменьшается
+    HeadCircleThickness = 2       -- Толщина круга головы
 }
 
--- Инициализация
-function ESP:Init()
-    for _, player in ipairs(self.Players:GetPlayers()) do
-        if player ~= self.Players.LocalPlayer then
-            self:CreateEsp(player)
-        end
-    end
-    
-    self.Players.PlayerAdded:Connect(function(player)
-        if player ~= self.Players.LocalPlayer then
-            self:CreateEsp(player)
-        end
-    end)
-    
-    self.Players.PlayerRemoving:Connect(function(player)
-        self:RemoveEsp(player)
-    end)
-    
-    self.RunService.RenderStepped:Connect(function()
-        for player, _ in pairs(self.cache) do
-            self:UpdateEsp(player)
-        end
-    end)
-end
+local player = Players.LocalPlayer
+local skeletons = {}
 
--- Создание элементов Drawing
-function ESP:CreateLine()
+-- Создание новой линии
+local function createLine()
     local line = Drawing.new("Line")
     line.Visible = false
     line.ZIndex = 10
     return line
 end
 
-function ESP:CreateCircle()
+-- Создание нового круга
+local function createCircle()
     local circle = Drawing.new("Circle")
     circle.Visible = false
     circle.ZIndex = 10
@@ -71,7 +36,7 @@ function ESP:CreateCircle()
 end
 
 -- Удаление скелета
-function ESP:RemoveSkeleton(skeleton)
+local function removeSkeleton(skeleton)
     if not skeleton then return end
     for _, drawing in pairs(skeleton) do
         if drawing and drawing.Remove then
@@ -80,19 +45,19 @@ function ESP:RemoveSkeleton(skeleton)
     end
 end
 
--- Проверка видимости
-function ESP:IsPartVisible(part)
+-- Проверка видимости части
+local function isPartVisible(part)
     if not part then return false end
-    local cameraPos = self.camera.CFrame.Position
+    local cameraPos = camera.CFrame.Position
     local partPos = part.Position
     local ray = Ray.new(cameraPos, (partPos - cameraPos).Unit * 1000)
-    local hit = workspace:FindPartOnRayWithIgnoreList(ray, {self.player.Character})
+    local hit = workspace:FindPartOnRayWithIgnoreList(ray, {player.Character})
     return hit == nil or hit:IsDescendantOf(part.Parent)
 end
 
 -- Обновление скелета игрока
-function ESP:UpdateSkeleton(plr, skeleton)
-   if not ESP_SETTINGS.Enabled then
+local function updateSkeleton(plr, skeleton)
+    if not ESP_SETTINGS.Enabled then
         for _, drawing in pairs(skeleton) do
             if drawing then drawing.Visible = false end
         end
@@ -223,47 +188,55 @@ function ESP:UpdateSkeleton(plr, skeleton)
 end
 
 -- Трекинг игрока
-function ESP:TrackPlayer(plr)
-    if plr == self.player then return end
+local function trackPlayer(plr)
+    if plr == player then return end
     
     local skeleton = {}
-    self.skeletons[plr] = skeleton
+    skeletons[plr] = skeleton
 
     local connection
-    connection = self.RunService.Heartbeat:Connect(function()
-        self:UpdateSkeleton(plr, skeleton)
+    connection = RunService.Heartbeat:Connect(function()
+        updateSkeleton(plr, skeleton)
     end)
 
+    -- Очистка при удалении игрока
     plr.AncestryChanged:Connect(function(_, parent)
         if not parent then
             connection:Disconnect()
-            self:RemoveSkeleton(skeleton)
-            self.skeletons[plr] = nil
+            removeSkeleton(skeleton)
+            skeletons[plr] = nil
         end
     end)
 end
 
--- Управление ESP
-function ESP:Toggle(state)
-    self.Settings.Enabled = state
-    -- Принудительное обновление всех ESP
-    for player, esp in pairs(self.cache) do
-        self:UpdateEsp(player)
+-- Включение/выключение ESP
+local function toggleESP(state)
+    ESP_SETTINGS.Enabled = state
+    for plr, skeleton in pairs(skeletons) do
+        updateSkeleton(plr, skeleton)
     end
 end
 
-function ESP:UpdateAll()
-    for player, esp in pairs(self.cache) do
-        self:UpdateEsp(player)
+-- Включение/выключение круга головы
+local function toggleHeadCircle(state)
+    ESP_SETTINGS.HeadCircle = state
+    for plr, skeleton in pairs(skeletons) do
+        updateSkeleton(plr, skeleton)
     end
 end
 
-function ESP:ToggleHeadCircle(state)
-    self.ESP_SETTINGS.HeadCircle = state
-    for plr, skeleton in pairs(self.skeletons) do
-        self:UpdateSkeleton(plr, skeleton)
-    end
+-- Инициализация
+Players.PlayerAdded:Connect(trackPlayer)
+Players.PlayerRemoving:Connect(function(plr)
+    removeSkeleton(skeletons[plr])
+    skeletons[plr] = nil
+end)
+
+for _, plr in ipairs(Players:GetPlayers()) do
+    trackPlayer(plr)
 end
 
-ESP:Init()
-return ESP
+-- Пример использования:
+-- toggleESP(true)        -- Включить ESP
+-- toggleESP(false)       -- Выключить ESP
+-- toggleHeadCircle(true) -- Включить круги вокруг голов
