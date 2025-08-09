@@ -5,25 +5,27 @@ local RunService = game:GetService("RunService")
 local camera = workspace.CurrentCamera
 
 local ESP_SETTINGS = {
-    Enabled = true,                -- Главный переключатель ESP
-    Skeleton = {
-        Enabled = true,            -- Включить скелет
-        Color = Color3.new(1, 0, 0), -- Красный цвет скелета
-        Thickness = 2,             -- Толщина линий
-        TeamCheck = false,         -- Использовать цвет команды
-        VisibleOnly = false,       -- Показывать только видимых игроков
-        HeadCircle = true,         -- Круг вокруг головы
-        HeadCircleRadius = 15,     -- Радиус круга
-        HeadCircleThickness = 2    -- Толщина круга
-    },
-    Name = {
-        Enabled = true,            -- Включить имена
-        Color = Color3.new(1, 1, 1), -- Белый цвет текста
-        ShowDistance = true,       -- Показывать дистанцию
-        Size = 14,                 -- Размер текста
-        Outline = true,            -- Обводка текста
-        OutlineColor = Color3.new(0, 0, 0), -- Черная обводка
-        Offset = Vector2.new(0, -30) -- Смещение текста
+    MasterSwitch = true,           -- Главный переключатель (влияет на ВСЕ компоненты)
+    Components = {
+        Skeleton = {
+            Enabled = true,        -- Включить скелет
+            Color = Color3.new(1, 0, 0), -- Красный цвет
+            Thickness = 2,
+            TeamCheck = false,
+            VisibleOnly = false,
+            HeadCircle = true,
+            HeadCircleRadius = 15,
+            HeadCircleThickness = 2
+        },
+        Name = {
+            Enabled = true,        -- Включить имена
+            Color = Color3.new(1, 1, 1), -- Белый цвет
+            ShowDistance = true,
+            Size = 14,
+            Outline = true,
+            OutlineColor = Color3.new(0, 0, 0),
+            Offset = Vector2.new(0, -30)
+        }
     }
 }
 
@@ -76,8 +78,8 @@ end
 
 -- Получение цвета для игрока
 local function getPlayerColor(plr, forSkeleton)
-    local settings = forSkeleton and ESP_SETTINGS.Skeleton or ESP_SETTINGS.Name
-    if forSkeleton and ESP_SETTINGS.Skeleton.TeamCheck and plr.Team then
+    local settings = ESP_SETTINGS.Components[forSkeleton and "Skeleton" or "Name"]
+    if forSkeleton and settings.TeamCheck and plr.Team then
         return plr.TeamColor.Color
     end
     return settings.Color
@@ -85,7 +87,8 @@ end
 
 -- Обновление ESP
 local function updateSkeleton(plr, skeleton)
-    if not ESP_SETTINGS.Enabled then
+    -- Главный переключатель выключен - скрываем всё
+    if not ESP_SETTINGS.MasterSwitch then
         for _, drawing in pairs(skeleton) do
             if drawing then drawing.Visible = false end
         end
@@ -104,7 +107,7 @@ local function updateSkeleton(plr, skeleton)
     if not humanoid then return end
 
     -- Обновление скелета
-    if ESP_SETTINGS.Skeleton.Enabled then
+    if ESP_SETTINGS.Components.Skeleton.Enabled then
         local joints = {}
         local connections = {}
 
@@ -170,9 +173,9 @@ local function updateSkeleton(plr, skeleton)
                 skeleton["line_"..index] = line
 
                 line.Color = getPlayerColor(plr, true)
-                line.Thickness = ESP_SETTINGS.Skeleton.Thickness
+                line.Thickness = ESP_SETTINGS.Components.Skeleton.Thickness
 
-                if onScreenA and onScreenB and (not ESP_SETTINGS.Skeleton.VisibleOnly or (isPartVisible(jointA) and isPartVisible(jointB))) then
+                if onScreenA and onScreenB and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or (isPartVisible(jointA) and isPartVisible(jointB))) then
                     line.From = Vector2.new(posA.X, posA.Y)
                     line.To = Vector2.new(posB.X, posB.Y)
                     line.Visible = true
@@ -184,7 +187,7 @@ local function updateSkeleton(plr, skeleton)
             end
         end
 
-        if ESP_SETTINGS.Skeleton.HeadCircle then
+        if ESP_SETTINGS.Components.Skeleton.HeadCircle then
             local head = joints.Head
             if head then
                 local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
@@ -193,10 +196,10 @@ local function updateSkeleton(plr, skeleton)
                 skeleton.headCircle = headCircle
                 
                 headCircle.Color = getPlayerColor(plr, true)
-                headCircle.Thickness = ESP_SETTINGS.Skeleton.HeadCircleThickness
-                headCircle.Radius = ESP_SETTINGS.Skeleton.HeadCircleRadius
+                headCircle.Thickness = ESP_SETTINGS.Components.Skeleton.HeadCircleThickness
+                headCircle.Radius = ESP_SETTINGS.Components.Skeleton.HeadCircleRadius
                 
-                if onScreen and (not ESP_SETTINGS.Skeleton.VisibleOnly or isPartVisible(head)) then
+                if onScreen and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or isPartVisible(head)) then
                     headCircle.Position = Vector2.new(headPos.X, headPos.Y)
                     headCircle.Visible = true
                 else
@@ -216,7 +219,7 @@ local function updateSkeleton(plr, skeleton)
     end
 
     -- Обновление имени и дистанции
-    if ESP_SETTINGS.Name.Enabled then
+    if ESP_SETTINGS.Components.Name.Enabled then
         local head = character:FindFirstChild("Head")
         if head then
             local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
@@ -225,22 +228,22 @@ local function updateSkeleton(plr, skeleton)
             skeleton.nameText = nameText
             
             nameText.Color = getPlayerColor(plr, false)
-            nameText.Size = ESP_SETTINGS.Name.Size
-            nameText.Outline = ESP_SETTINGS.Name.Outline
-            nameText.OutlineColor = ESP_SETTINGS.Name.OutlineColor
+            nameText.Size = ESP_SETTINGS.Components.Name.Size
+            nameText.Outline = ESP_SETTINGS.Components.Name.Outline
+            nameText.OutlineColor = ESP_SETTINGS.Components.Name.OutlineColor
             
             local distanceText = ""
-            if ESP_SETTINGS.Name.ShowDistance then
+            if ESP_SETTINGS.Components.Name.ShowDistance then
                 local distance = (head.Position - camera.CFrame.Position).Magnitude
                 distanceText = string.format(" [%d]", math.floor(distance))
             end
             
             nameText.Text = plr.Name .. distanceText
             
-            if onScreen and (not ESP_SETTINGS.Skeleton.VisibleOnly or isPartVisible(head)) then
+            if onScreen then
                 nameText.Position = Vector2.new(
-                    headPos.X + ESP_SETTINGS.Name.Offset.X,
-                    headPos.Y + ESP_SETTINGS.Name.Offset.Y
+                    headPos.X + ESP_SETTINGS.Components.Name.Offset.X,
+                    headPos.Y + ESP_SETTINGS.Components.Name.Offset.Y
                 )
                 nameText.Visible = true
             else
@@ -277,35 +280,35 @@ end
 
 -- API функции
 function ESP:Toggle(state)
-    ESP_SETTINGS.Enabled = state
+    ESP_SETTINGS.MasterSwitch = state
     for plr, skeleton in pairs(skeletons) do
         updateSkeleton(plr, skeleton)
     end
 end
 
 function ESP:ToggleSkeleton(state)
-    ESP_SETTINGS.Skeleton.Enabled = state
+    ESP_SETTINGS.Components.Skeleton.Enabled = state
     for plr, skeleton in pairs(skeletons) do
         updateSkeleton(plr, skeleton)
     end
 end
 
 function ESP:ToggleNames(state)
-    ESP_SETTINGS.Name.Enabled = state
+    ESP_SETTINGS.Components.Name.Enabled = state
     for plr, skeleton in pairs(skeletons) do
         updateSkeleton(plr, skeleton)
     end
 end
 
 function ESP:SetSkeletonColor(color)
-    ESP_SETTINGS.Skeleton.Color = color
+    ESP_SETTINGS.Components.Skeleton.Color = color
     for plr, skeleton in pairs(skeletons) do
         updateSkeleton(plr, skeleton)
     end
 end
 
 function ESP:SetNameColor(color)
-    ESP_SETTINGS.Name.Color = color
+    ESP_SETTINGS.Components.Name.Color = color
     for plr, skeleton in pairs(skeletons) do
         updateSkeleton(plr, skeleton)
     end
@@ -326,11 +329,11 @@ end
 setmetatable(ESP, {
     __index = function(t, k)
         if k == "Enabled" then
-            return ESP_SETTINGS.Enabled
+            return ESP_SETTINGS.MasterSwitch
         elseif k == "SkeletonEnabled" then
-            return ESP_SETTINGS.Skeleton.Enabled
+            return ESP_SETTINGS.Components.Skeleton.Enabled
         elseif k == "NamesEnabled" then
-            return ESP_SETTINGS.Name.Enabled
+            return ESP_SETTINGS.Components.Name.Enabled
         end
     end,
     __newindex = function(t, k, v)
