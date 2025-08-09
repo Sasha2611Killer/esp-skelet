@@ -1,42 +1,57 @@
 local ESP = {
+    Settings = {
+        BoxOutlineColor = Color3.new(0, 0, 0),
+        BoxColor = Color3.new(1, 1, 1),
+        NameColor = Color3.new(1, 1, 1),
+        HealthOutlineColor = Color3.new(0, 0, 0),
+        HealthHighColor = Color3.new(0, 1, 0),
+        HealthLowColor = Color3.new(1, 0, 0),
+        CharSize = Vector2.new(4, 6),
+        Teamcheck = false,
+        WallCheck = false,
+        Enabled = false,
+        ShowBox = false,
+        BoxType = "2D",
+        ShowName = false,
+        ShowHealth = false,
+        ShowDistance = false,
+        ShowSkeletons = false,
+        ShowTracer = false,
+        TracerColor = Color3.new(1, 1, 1), 
+        TracerThickness = 2,
+        SkeletonsColor = Color3.new(1, 1, 1),
+        TracerPosition = "Bottom",
+    },
+    
     Players = game:GetService("Players"),
     RunService = game:GetService("RunService"),
     camera = workspace.CurrentCamera,
-    
-    ESP_SETTINGS = {
-        Enabled = false,
-        Color = Color3.new(0, 1, 0),
-        Thickness = 2,
-        TeamCheck = true,
-        VisibleOnly = false,
-        HeadCircle = true,
-        HeadCircleBaseRadius = 15,
-        HeadCircleMinRadius = 3,
-        HeadCircleMaxDistance = 100,
-        HeadCircleThickness = 2
-    },
-    
-    player = nil,
-    skeletons = {}
+    cache = {}
 }
 
 -- Инициализация
 function ESP:Init()
-    self.player = self.Players.LocalPlayer
-    
-    -- Подключаем обработчики игроков
-    self.Players.PlayerAdded:Connect(function(plr)
-        self:TrackPlayer(plr)
-    end)
-    
-    self.Players.PlayerRemoving:Connect(function(plr)
-        self:RemoveSkeleton(self.skeletons[plr])
-        self.skeletons[plr] = nil
-    end)
-
-    for _, plr in ipairs(self.Players:GetPlayers()) do
-        self:TrackPlayer(plr)
+    for _, player in ipairs(self.Players:GetPlayers()) do
+        if player ~= self.Players.LocalPlayer then
+            self:CreateEsp(player)
+        end
     end
+    
+    self.Players.PlayerAdded:Connect(function(player)
+        if player ~= self.Players.LocalPlayer then
+            self:CreateEsp(player)
+        end
+    end)
+    
+    self.Players.PlayerRemoving:Connect(function(player)
+        self:RemoveEsp(player)
+    end)
+    
+    self.RunService.RenderStepped:Connect(function()
+        for player, _ in pairs(self.cache) do
+            self:UpdateEsp(player)
+        end
+    end)
 end
 
 -- Создание элементов Drawing
@@ -230,9 +245,16 @@ end
 
 -- Управление ESP
 function ESP:Toggle(state)
-    self.ESP_SETTINGS.Enabled = state
-    for plr, skeleton in pairs(self.skeletons) do
-        self:UpdateSkeleton(plr, skeleton)
+    self.Settings.Enabled = state
+    -- Принудительное обновление всех ESP
+    for player, esp in pairs(self.cache) do
+        self:UpdateEsp(player)
+    end
+end
+
+function ESP:UpdateAll()
+    for player, esp in pairs(self.cache) do
+        self:UpdateEsp(player)
     end
 end
 
@@ -243,13 +265,5 @@ function ESP:ToggleHeadCircle(state)
     end
 end
 
--- Инициализируем ESP
 ESP:Init()
-
--- Возвращаем объект ESP для внешнего доступа
--- В самом конце скрипта добавьте:
-return {
-    Settings = ESP_SETTINGS,
-    Toggle = toggleESP,
-    ToggleHeadCircle = toggleHeadCircle
-}
+return ESP
