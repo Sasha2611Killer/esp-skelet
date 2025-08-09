@@ -15,10 +15,10 @@ local ESP_SETTINGS = {
 			VisibleOnly = false,
 			HeadCircle = {
 				Enabled = true,
-				BaseRadius = 2,          -- Базовый размер (в пикселях)
-				ScaleFactor = 0.5,       -- Коэффициент масштабирования
-				MinRadius = 1,           -- Минимальный размер
-				Thickness = 2
+                BaseRadius = 10,          -- Увеличено с 2 до 10
+                ScaleFactor = 0.03,       -- Уменьшено с 0.5 до 0.03
+                MinRadius = 5,            -- Увеличено с 1 до 5
+                Thickness = 2
 			}
 		},
 		Name = {
