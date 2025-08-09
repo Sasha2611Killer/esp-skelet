@@ -201,18 +201,8 @@ local function updateSkeleton(plr, skeleton)
 				headCircle.Color = getPlayerColor(plr, true)
 				headCircle.Thickness = ESP_SETTINGS.Components.Skeleton.HeadCircle.Thickness
 
-				-- Рассчитываем размер на основе расстояния
-				local distance = (head.Position - camera.CFrame.Position).Magnitude
-				local scale = math.max(ESP_SETTINGS.Components.Skeleton.HeadCircle.MinSize, 
-					ESP_SETTINGS.Components.Skeleton.HeadCircle.BaseSize / (distance * 0.1))
-
-				-- Получаем реальный размер головы в пикселях
-				local headSize = head.Size.X * scale
-				local point1 = camera:WorldToViewportPoint(head.Position + Vector3.new(headSize, 0, 0))
-				local point2 = camera:WorldToViewportPoint(head.Position)
-				local radius = (point1 - point2).magnitude
-
-				headCircle.Radius = radius
+				-- Используем фиксированный радиус
+				headCircle.Radius = 8  -- Размер выбирается вручную, экспериментально подобрать нужный размер
 
 				if onScreen and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or isPartVisible(head)) then
 					headCircle.Position = Vector2.new(headPos.X, headPos.Y)
@@ -220,9 +210,9 @@ local function updateSkeleton(plr, skeleton)
 				else
 					headCircle.Visible = false
 				end
-			elseif skeleton.headCircle then
-				skeleton.headCircle.Visible = false
 			end
+		elseif skeleton.headCircle then
+			skeleton.headCircle.Visible = false
 		end
 	else
 		-- Скрываем скелет если он отключен
