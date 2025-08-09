@@ -246,187 +246,156 @@ local function updateSkeleton(plr, skeleton)
 
 	-- Обновление Box ESP
 	if ESP_SETTINGS.Components.Box.Enabled then
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if rootPart then
-        local rootPos, onScreen = camera:WorldToViewportPoint(rootPart.Position)
+		local rootPart = character:FindFirstChild("HumanoidRootPart")
+		if rootPart then
+			local rootPos, onScreen = camera:WorldToViewportPoint(rootPart.Position)
 
-        if onScreen and (not ESP_SETTINGS.Components.Box.VisibleOnly or isPartVisible(rootPart)) then
-            if ESP_SETTINGS.BoxType == "2D" then
-                -- Очищаем старые 3D линии если они есть
-                for i = 1, 12 do
-                    if skeleton["box3d_line_"..i] then
-                        skeleton["box3d_line_"..i].Visible = false
-                    end
-                end
-                
-                -- 2D Box - улучшенный расчет
-                local head = character:FindFirstChild("Head")
-                local humanoid = character:FindFirstChildOfClass("Humanoid")
-                
-                if head and humanoid then
-                    local torsoName = humanoid.RigType == Enum.HumanoidRigType.R15 and "UpperTorso" or "Torso"
-                    local torso = character:FindFirstChild(torsoName)
-                    
-                    if torso then
-                        local headPos = camera:WorldToViewportPoint(head.Position + Vector3.new(0, head.Size.Y/2 + 0.2, 0))
-                        local torsoPos = camera:WorldToViewportPoint(torso.Position - Vector3.new(0, torso.Size.Y, 0))
-                        
-                        local width = math.max(head.Size.X, torso.Size.X) * 2.5
-                        local height = torsoPos.Y - headPos.Y
-                        
-                        local topLeft = Vector2.new(headPos.X - width/2, headPos.Y)
-                        local topRight = Vector2.new(headPos.X + width/2, headPos.Y)
-                        local bottomLeft = Vector2.new(torsoPos.X - width/2, torsoPos.Y)
-                        local bottomRight = Vector2.new(torsoPos.X + width/2, torsoPos.Y)
+			if onScreen and (not ESP_SETTINGS.Components.Box.VisibleOnly or isPartVisible(rootPart)) then
+				if ESP_SETTINGS.BoxType == "2D" then
+					-- 2D Box
+					local head = character:FindFirstChild("Head")
+					local torso = character:FindFirstChild(character:FindFirstChildOfClass("Humanoid").RigType == Enum.HumanoidRigType.R15 and "UpperTorso" or "Torso")
 
-                        local boxQuad = skeleton.boxQuad or createQuad()
-                        skeleton.boxQuad = boxQuad
+					if head and torso then
+						local headPos = camera:WorldToViewportPoint(head.Position + Vector3.new(0, head.Size.Y/2, 0))
+						local torsoPos = camera:WorldToViewportPoint(torso.Position - Vector3.new(0, torso.Size.Y/2, 0))
 
-                        boxQuad.PointA = topLeft
-                        boxQuad.PointB = topRight
-                        boxQuad.PointC = bottomRight
-                        boxQuad.PointD = bottomLeft
-                        boxQuad.Color = getPlayerColor(plr, false)
-                        boxQuad.Thickness = ESP_SETTINGS.Components.Box.Thickness
-                        boxQuad.Filled = ESP_SETTINGS.Components.Box.FillTransparency < 1
-                        boxQuad.Transparency = ESP_SETTINGS.Components.Box.FillTransparency
-                        boxQuad.Visible = true
+						local width = (headPos.X - torsoPos.X) * 2
+						local height = torsoPos.Y - headPos.Y
 
-                        -- Outline for 2D box
-                        local outlineQuad = skeleton.outlineQuad or createQuad()
-                        skeleton.outlineQuad = outlineQuad
+						local topLeft = Vector2.new(headPos.X - width/2, headPos.Y)
+						local topRight = Vector2.new(headPos.X + width/2, headPos.Y)
+						local bottomLeft = Vector2.new(torsoPos.X - width/2, torsoPos.Y)
+						local bottomRight = Vector2.new(torsoPos.X + width/2, torsoPos.Y)
 
-                        outlineQuad.PointA = topLeft - Vector2.new(1,1)
-                        outlineQuad.PointB = topRight + Vector2.new(1,-1)
-                        outlineQuad.PointC = bottomRight + Vector2.new(1,1)
-                        outlineQuad.PointD = bottomLeft + Vector2.new(-1,1)
-                        outlineQuad.Color = Color3.new(0,0,0)
-                        outlineQuad.Thickness = ESP_SETTINGS.Components.Box.Thickness + 1
-                        outlineQuad.Filled = false
-                        outlineQuad.Visible = true
-                    end
-                end
-            else
-                -- 3D Box - очищаем старые 2D элементы
-                if skeleton.boxQuad then skeleton.boxQuad.Visible = false end
-                if skeleton.outlineQuad then skeleton.outlineQuad.Visible = false end
-                
-                -- Улучшенный 3D бокс
-                local rootPart = character:FindFirstChild("HumanoidRootPart")
-                if rootPart then
-                    local humanoid = character:FindFirstChildOfClass("Humanoid")
-                    if humanoid then
-                        local torsoName = humanoid.RigType == Enum.HumanoidRigType.R15 and "UpperTorso" or "Torso"
-                        local torso = character:FindFirstChild(torsoName)
-                        local head = character:FindFirstChild("Head")
-                        
-                        if torso and head then
-                            local height = (head.Position - torso.Position).Magnitude * 2.5
-                            local width = math.max(head.Size.X, torso.Size.X) * 2
-                            local depth = width * 0.6
-                            
-                            local cf = rootPart.CFrame
-                            local size = Vector3.new(width, height, depth)
-                            
-                            local points = {
-                                cf * CFrame.new(size.X/2, size.Y/2, size.Z/2).Position,
-                                cf * CFrame.new(-size.X/2, size.Y/2, size.Z/2).Position,
-                                cf * CFrame.new(-size.X/2, -size.Y/2, size.Z/2).Position,
-                                cf * CFrame.new(size.X/2, -size.Y/2, size.Z/2).Position,
-                                cf * CFrame.new(size.X/2, size.Y/2, -size.Z/2).Position,
-                                cf * CFrame.new(-size.X/2, size.Y/2, -size.Z/2).Position,
-                                cf * CFrame.new(-size.X/2, -size.Y/2, -size.Z/2).Position,
-                                cf * CFrame.new(size.X/2, -size.Y/2, -size.Z/2).Position
-                            }
+						local boxQuad = skeleton.boxQuad or createQuad()
+						skeleton.boxQuad = boxQuad
 
-                            local screenPoints = {}
-                            local allOnScreen = true
+						boxQuad.PointA = topLeft
+						boxQuad.PointB = topRight
+						boxQuad.PointC = bottomRight
+						boxQuad.PointD = bottomLeft
+						boxQuad.Color = getPlayerColor(plr, false)
+						boxQuad.Thickness = ESP_SETTINGS.Components.Box.Thickness
+						boxQuad.Filled = ESP_SETTINGS.Components.Box.FillTransparency < 1
+						boxQuad.Transparency = ESP_SETTINGS.Components.Box.FillTransparency
+						boxQuad.Visible = true
 
-                            for i, point in ipairs(points) do
-                                local screenPoint, onScreen = camera:WorldToViewportPoint(point)
-                                screenPoints[i] = Vector2.new(screenPoint.X, screenPoint.Y)
-                                if not onScreen then allOnScreen = false end
-                            end
+						-- Outline for 2D box
+						local outlineQuad = skeleton.outlineQuad or createQuad()
+						skeleton.outlineQuad = outlineQuad
 
-                            if allOnScreen then
-                                -- Front face
-                                for i = 1, 3 do
-                                    local line = skeleton["box3d_line_"..i] or createLine()
-                                    skeleton["box3d_line_"..i] = line
-                                    line.From = screenPoints[i]
-                                    line.To = screenPoints[i+1]
-                                    line.Color = getPlayerColor(plr, false)
-                                    line.Thickness = ESP_SETTINGS.Components.Box.Thickness
-                                    line.Visible = true
-                                end
-                                local line4 = skeleton["box3d_line_4"] or createLine()
-                                skeleton["box3d_line_4"] = line4
-                                line4.From = screenPoints[4]
-                                line4.To = screenPoints[1]
-                                line4.Color = getPlayerColor(plr, false)
-                                line4.Thickness = ESP_SETTINGS.Components.Box.Thickness
-                                line4.Visible = true
+						outlineQuad.PointA = topLeft - Vector2.new(1,1)
+						outlineQuad.PointB = topRight + Vector2.new(1,-1)
+						outlineQuad.PointC = bottomRight + Vector2.new(1,1)
+						outlineQuad.PointD = bottomLeft + Vector2.new(-1,1)
+						outlineQuad.Color = Color3.new(0,0,0)
+						outlineQuad.Thickness = ESP_SETTINGS.Components.Box.Thickness + 1
+						outlineQuad.Filled = false
+						outlineQuad.Visible = true
+					end
+				else
+					-- 3D Box
+					local rootPart = character:FindFirstChild("HumanoidRootPart")
+					if rootPart then
+						local cf = rootPart.CFrame
+						local size = rootPart.Size * 2
 
-                                -- Back face
-                                for i = 5, 7 do
-                                    local line = skeleton["box3d_line_"..i] or createLine()
-                                    skeleton["box3d_line_"..i] = line
-                                    line.From = screenPoints[i]
-                                    line.To = screenPoints[i+1]
-                                    line.Color = getPlayerColor(plr, false)
-                                    line.Thickness = ESP_SETTINGS.Components.Box.Thickness
-                                    line.Visible = true
-                                end
-                                local line8 = skeleton["box3d_line_8"] or createLine()
-                                skeleton["box3d_line_8"] = line8
-                                line8.From = screenPoints[8]
-                                line8.To = screenPoints[5]
-                                line8.Color = getPlayerColor(plr, false)
-                                line8.Thickness = ESP_SETTINGS.Components.Box.Thickness
-                                line8.Visible = true
+						local points = {
+							cf * CFrame.new(size.X/2, size.Y/2, size.Z/2).Position,
+							cf * CFrame.new(-size.X/2, size.Y/2, size.Z/2).Position,
+							cf * CFrame.new(-size.X/2, -size.Y/2, size.Z/2).Position,
+							cf * CFrame.new(size.X/2, -size.Y/2, size.Z/2).Position,
+							cf * CFrame.new(size.X/2, size.Y/2, -size.Z/2).Position,
+							cf * CFrame.new(-size.X/2, size.Y/2, -size.Z/2).Position,
+							cf * CFrame.new(-size.X/2, -size.Y/2, -size.Z/2).Position,
+							cf * CFrame.new(size.X/2, -size.Y/2, -size.Z/2).Position
+						}
 
-                                -- Connecting lines
-                                for i = 1, 4 do
-                                    local line = skeleton["box3d_line_"..(8+i)] or createLine()
-                                    skeleton["box3d_line_"..(8+i)] = line
-                                    line.From = screenPoints[i]
-                                    line.To = screenPoints[i+4]
-                                    line.Color = getPlayerColor(plr, false)
-                                    line.Thickness = ESP_SETTINGS.Components.Box.Thickness
-                                    line.Visible = true
-                                end
-                            else
-                                for i = 1, 12 do
-                                    if skeleton["box3d_line_"..i] then
-                                        skeleton["box3d_line_"..i].Visible = false
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        else
-            -- Если не на экране, скрываем все элементы бокса
-            if skeleton.boxQuad then skeleton.boxQuad.Visible = false end
-            if skeleton.outlineQuad then skeleton.outlineQuad.Visible = false end
-            for i = 1, 12 do
-                if skeleton["box3d_line_"..i] then
-                    skeleton["box3d_line_"..i].Visible = false
-                end
-            end
-        end
-    end
-else
-    -- Если боксы отключены, скрываем все элементы
-    if skeleton.boxQuad then skeleton.boxQuad.Visible = false end
-    if skeleton.outlineQuad then skeleton.outlineQuad.Visible = false end
-    for i = 1, 12 do
-        if skeleton["box3d_line_"..i] then
-            skeleton["box3d_line_"..i].Visible = false
-        end
-    end
-end
+						local screenPoints = {}
+						local allOnScreen = true
+
+						for i, point in ipairs(points) do
+							local screenPoint, onScreen = camera:WorldToViewportPoint(point)
+							screenPoints[i] = Vector2.new(screenPoint.X, screenPoint.Y)
+							if not onScreen then allOnScreen = false end
+						end
+
+						if allOnScreen then
+							-- Front face
+							for i = 1, 3 do
+								local line = skeleton["box3d_line_"..i] or createLine()
+								skeleton["box3d_line_"..i] = line
+								line.From = screenPoints[i]
+								line.To = screenPoints[i+1]
+								line.Color = getPlayerColor(plr, false)
+								line.Thickness = ESP_SETTINGS.Components.Box.Thickness
+								line.Visible = true
+							end
+							local line4 = skeleton["box3d_line_4"] or createLine()
+							skeleton["box3d_line_4"] = line4
+							line4.From = screenPoints[4]
+							line4.To = screenPoints[1]
+							line4.Color = getPlayerColor(plr, false)
+							line4.Thickness = ESP_SETTINGS.Components.Box.Thickness
+							line4.Visible = true
+
+							-- Back face
+							for i = 5, 7 do
+								local line = skeleton["box3d_line_"..i] or createLine()
+								skeleton["box3d_line_"..i] = line
+								line.From = screenPoints[i]
+								line.To = screenPoints[i+1]
+								line.Color = getPlayerColor(plr, false)
+								line.Thickness = ESP_SETTINGS.Components.Box.Thickness
+								line.Visible = true
+							end
+							local line8 = skeleton["box3d_line_8"] or createLine()
+							skeleton["box3d_line_8"] = line8
+							line8.From = screenPoints[8]
+							line8.To = screenPoints[5]
+							line8.Color = getPlayerColor(plr, false)
+							line8.Thickness = ESP_SETTINGS.Components.Box.Thickness
+							line8.Visible = true
+
+							-- Connecting lines
+							for i = 1, 4 do
+								local line = skeleton["box3d_line_"..(8+i)] or createLine()
+								skeleton["box3d_line_"..(8+i)] = line
+								line.From = screenPoints[i]
+								line.To = screenPoints[i+4]
+								line.Color = getPlayerColor(plr, false)
+								line.Thickness = ESP_SETTINGS.Components.Box.Thickness
+								line.Visible = true
+							end
+						else
+							for i = 1, 12 do
+								if skeleton["box3d_line_"..i] then
+									skeleton["box3d_line_"..i].Visible = false
+								end
+							end
+						end
+					end
+				end
+			else
+				if skeleton.boxQuad then skeleton.boxQuad.Visible = false end
+				if skeleton.outlineQuad then skeleton.outlineQuad.Visible = false end
+				for i = 1, 12 do
+					if skeleton["box3d_line_"..i] then
+						skeleton["box3d_line_"..i].Visible = false
+					end
+				end
+			end
+		end
+	else
+		if skeleton.boxQuad then skeleton.boxQuad.Visible = false end
+		if skeleton.outlineQuad then skeleton.outlineQuad.Visible = false end
+		for i = 1, 12 do
+			if skeleton["box3d_line_"..i] then
+				skeleton["box3d_line_"..i].Visible = false
+			end
+		end
+	end
 
 	-- Обновление имени и дистанции
 	if ESP_SETTINGS.Components.Name.Enabled then
