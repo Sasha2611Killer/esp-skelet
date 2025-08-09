@@ -15,10 +15,10 @@ local ESP_SETTINGS = {
 			VisibleOnly = false,
 			HeadCircle = {
 				Enabled = true,
-                BaseRadius = 10,          -- Увеличено с 2 до 10
-                ScaleFactor = 0.03,       -- Уменьшено с 0.5 до 0.03
-                MinRadius = 5,            -- Увеличено с 1 до 5
-                Thickness = 2
+				BaseRadius = 15,          -- Размер вблизи (пиксели)
+				MinRadius = 5,             -- Минимальный размер
+				MaxDistance = 50,          -- Дистанция для минимального размера
+				Thickness = 2
 			}
 		},
 		Name = {
@@ -192,36 +192,34 @@ local function updateSkeleton(plr, skeleton)
 		end
 
 		if ESP_SETTINGS.Components.Skeleton.HeadCircle.Enabled then
-    local head = joints.Head
-    if head then
-        local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
-        
-        local headCircle = skeleton.headCircle or createCircle()
-        skeleton.headCircle = headCircle
-        
-        headCircle.Color = getPlayerColor(plr, true)
-        headCircle.Thickness = ESP_SETTINGS.Components.Skeleton.HeadCircle.Thickness
-        
-        -- Более точный расчет радиуса
-        local distance = (head.Position - camera.CFrame.Position).Magnitude
-        local headSize = head.Size.X * 50  -- Эмпирический коэффициент для размера головы
-        local radius = math.min(headSize / distance, 15)  -- Ограничиваем максимальный размер
-        
-        -- Применяем минимальный радиус
-        radius = math.max(radius, ESP_SETTINGS.Components.Skeleton.HeadCircle.MinRadius)
-        
-        headCircle.Radius = radius
-        
-        if onScreen and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or isPartVisible(head)) then
-            headCircle.Position = Vector2.new(headPos.X, headPos.Y)
-            headCircle.Visible = true
-        else
-            headCircle.Visible = false
-        end
-    elseif skeleton.headCircle then
-        skeleton.headCircle.Visible = false
-    end
-end
+			local head = joints.Head
+			if head then
+				local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
+
+				local headCircle = skeleton.headCircle or createCircle()
+				skeleton.headCircle = headCircle
+
+				headCircle.Color = getPlayerColor(plr, true)
+				headCircle.Thickness = ESP_SETTINGS.Components.Skeleton.HeadCircle.Thickness
+
+				-- Правильный расчет радиуса с инверсной зависимостью от расстояния
+				local distance = (head.Position - camera.CFrame.Position).Magnitude
+				local distanceFactor = math.clamp(distance / ESP_SETTINGS.Components.Skeleton.HeadCircle.MaxDistance, 0, 1)
+				local radius = ESP_SETTINGS.Components.Skeleton.HeadCircle.BaseRadius * (1 - distanceFactor) + 
+					ESP_SETTINGS.Components.Skeleton.HeadCircle.MinRadius * distanceFactor
+
+				headCircle.Radius = radius
+
+				if onScreen and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or isPartVisible(head)) then
+					headCircle.Position = Vector2.new(headPos.X, headPos.Y)
+					headCircle.Visible = true
+				else
+					headCircle.Visible = false
+				end
+			elseif skeleton.headCircle then
+				skeleton.headCircle.Visible = false
+			end
+		end
 	else
 		-- Скрываем скелет если он отключен
 		for k, drawing in pairs(skeleton) do
