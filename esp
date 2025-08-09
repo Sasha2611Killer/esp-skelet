@@ -15,9 +15,8 @@ local ESP_SETTINGS = {
 			VisibleOnly = false,
 			HeadCircle = {
 				Enabled = true,
-				BaseRadius = 15,          -- Размер вблизи (пиксели)
-				MinRadius = 5,             -- Минимальный размер
-				MaxDistance = 50,          -- Дистанция для минимального размера
+				BaseSize = 1.5,  -- Базовый множитель размера головы
+				MinSize = 0.3,   -- Минимальный множитель
 				Thickness = 2
 			}
 		},
@@ -202,11 +201,16 @@ local function updateSkeleton(plr, skeleton)
 				headCircle.Color = getPlayerColor(plr, true)
 				headCircle.Thickness = ESP_SETTINGS.Components.Skeleton.HeadCircle.Thickness
 
-				-- Правильный расчет радиуса с инверсной зависимостью от расстояния
+				-- Рассчитываем размер на основе расстояния
 				local distance = (head.Position - camera.CFrame.Position).Magnitude
-				local distanceFactor = math.clamp(distance / ESP_SETTINGS.Components.Skeleton.HeadCircle.MaxDistance, 0, 1)
-				local radius = ESP_SETTINGS.Components.Skeleton.HeadCircle.BaseRadius * (1 - distanceFactor) + 
-					ESP_SETTINGS.Components.Skeleton.HeadCircle.MinRadius * distanceFactor
+				local scale = math.max(ESP_SETTINGS.Components.Skeleton.HeadCircle.MinSize, 
+					ESP_SETTINGS.Components.Skeleton.HeadCircle.BaseSize / (distance * 0.1))
+
+				-- Получаем реальный размер головы в пикселях
+				local headSize = head.Size.X * scale
+				local point1 = camera:WorldToViewportPoint(head.Position + Vector3.new(headSize, 0, 0))
+				local point2 = camera:WorldToViewportPoint(head.Position)
+				local radius = (point1 - point2).magnitude
 
 				headCircle.Radius = radius
 
