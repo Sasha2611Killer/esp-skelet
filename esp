@@ -13,11 +13,13 @@ local ESP_SETTINGS = {
 			Thickness = 2,
 			TeamCheck = false,
 			VisibleOnly = false,
-			HeadCircle = true,
-			HeadCircleBaseRadius = 15,  -- Базовый радиус на близком расстоянии
-			HeadCircleMinRadius = 3,    -- Минимальный радиус на дальнем расстоянии
-			HeadCircleMaxDistance = 15, -- Дистанция, после которой радиус не уменьшается
-			HeadCircleThickness = 2
+			HeadCircle = {
+				Enabled = true,
+				BaseRadius = 2,          -- Базовый размер (в пикселях)
+				ScaleFactor = 0.5,       -- Коэффициент масштабирования
+				MinRadius = 1,           -- Минимальный размер
+				Thickness = 2
+			}
 		},
 		Name = {
 			Enabled = false,
@@ -200,14 +202,11 @@ local function updateSkeleton(plr, skeleton)
 				headCircle.Color = getPlayerColor(plr, true)
 				headCircle.Thickness = ESP_SETTINGS.Components.Skeleton.HeadCircleThickness
 
-				-- Рассчитываем динамический радиус
-				local radius = ESP_SETTINGS.Components.Skeleton.HeadCircleBaseRadius
-				if ESP_SETTINGS.Components.Skeleton.HeadCircleDynamicScaling then
-					local distance = (head.Position - camera.CFrame.Position).Magnitude
-					local distanceFactor = math.clamp(distance / ESP_SETTINGS.Components.Skeleton.HeadCircleMaxDistance, 0, 1)
-					radius = ESP_SETTINGS.Components.Skeleton.HeadCircleBaseRadius * (1 - distanceFactor) + 
-						ESP_SETTINGS.Components.Skeleton.HeadCircleMinRadius * distanceFactor
-				end
+				-- Рассчитываем размер круга на основе расстояния
+				local distance = (head.Position - camera.CFrame.Position).Magnitude
+				local radius = ESP_SETTINGS.Components.Skeleton.HeadCircleBaseRadius + 
+					(distance * ESP_SETTINGS.Components.Skeleton.HeadCircleScaleFactor)
+				radius = math.max(radius, ESP_SETTINGS.Components.Skeleton.HeadCircleMinRadius)
 
 				headCircle.Radius = radius
 
