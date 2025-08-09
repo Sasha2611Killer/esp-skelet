@@ -7,22 +7,14 @@ local Camera = workspace.CurrentCamera
 
 -- Settings
 local ESP_SETTINGS = {
-    MasterSwitch = false,
-    BoxType = "2D", -- "2D" or "3D"
+    Enabled = false,
     Components = {
         Skeleton = {
             Enabled = false,
             Color = Color3.new(1, 0, 0),
             Thickness = 2,
             TeamCheck = false,
-            VisibleOnly = false,
-            HeadCircle = {
-                Enabled = true,
-                BaseSize = 1.5,
-                MinSize = 0.3,
-                Thickness = 2,
-                DynamicSize = true
-            }
+            VisibleOnly = true
         },
         Name = {
             Enabled = false,
@@ -31,14 +23,14 @@ local ESP_SETTINGS = {
             Size = 14,
             Outline = true,
             OutlineColor = Color3.new(0, 0, 0),
-            Offset = Vector2.new(0, -30)
+            Offset = Vector3.new(0, 2, 0) -- 3D offset from head
         },
         Box = {
             Enabled = false,
             Color = Color3.new(1, 1, 1),
             Thickness = 1,
             TeamCheck = false,
-            VisibleOnly = false,
+            VisibleOnly = true,
             FillTransparency = 1
         }
     }
@@ -47,12 +39,6 @@ local ESP_SETTINGS = {
 -- Cache
 local LocalPlayer = Players.LocalPlayer
 local Skeletons = {}
-local DrawingCache = {
-    Lines = {},
-    Circles = {},
-    Texts = {},
-    Quads = {}
-}
 
 -- Constants
 local R15_JOINTS = {
@@ -104,37 +90,6 @@ local R6_CONNECTIONS = {
 }
 
 -- Utility functions
-local function CreateDrawingObject(type, properties)
-    local drawing = Drawing.new(type)
-    for prop, value in pairs(properties) do
-        drawing[prop] = value
-    end
-    return drawing
-end
-
-local function GetCachedDrawing(type, key, skeleton, properties)
-    properties = properties or {}
-    properties.Visible = false
-    properties.ZIndex = 10
-
-    if not skeleton[key] then
-        skeleton[key] = CreateDrawingObject(type, properties)
-        DrawingCache[type.."s"][skeleton[key]] = true
-    end
-    return skeleton[key]
-end
-
-local function RemoveSkeleton(skeleton)
-    if not skeleton then return end
-
-    for _, drawing in pairs(skeleton) do
-        if drawing and drawing.Remove then
-            DrawingCache[drawing.ClassName][drawing] = nil
-            drawing:Remove()
-        end
-    end
-end
-
 local function IsPartVisible(part, character)
     if not part then return false end
     local cameraPos = Camera.CFrame.Position
@@ -151,68 +106,87 @@ local function GetPlayerColor(plr, component)
     return settings.Color
 end
 
--- Improved 3D box functions
-local function GetCorners(cf, size)
-    local corners = {}
-    local sx, sy, sz = size.X/2, size.Y/2, size.Z/2
+local function Draw3DLine(from, to, color, thickness, parentGui)
+    local part = Instance.new("Part")
+    part.Anchored = true
+    part.CanCollide = false
+    part.Transparency = 1
+    part.Size = Vector3.new(thickness, thickness, (from - to).Magnitude)
+    part.CFrame = CFrame.new((from + to)/2, to)
+    part.Color = color
     
-    corners[1] = cf * CFrame.new(sx, sy, sz)
-    corners[2] = cf * CFrame.new(-sx, sy, sz)
-    corners[3] = cf * CFrame.new(-sx, -sy, sz)
-    corners[4] = cf * CFrame.new(sx, -sy, sz)
-    corners[5] = cf * CFrame.new(sx, sy, -sz)
-    corners[6] = cf * CFrame.new(-sx, sy, -sz)
-    corners[7] = cf * CFrame.new(-sx, -sy, -sz)
-    corners[8] = cf * CFrame.new(sx, -sy, -sz)
+    local boxHandleAdornment = Instance.new("BoxHandleAdornment")
+    boxHandleAdornment.Adornee = part
+    boxHandleAdornment.AlwaysOnTop = true
+    boxHandleAdornment.ZIndex = 10
+    boxHandleAdornment.Size = part.Size
+    boxHandleAdornment.Color3 = color
+    boxHandleAdornment.Transparency = 0
+    boxHandleAdornment.Parent = parentGui
     
-    return corners
+    return {Part = part, Adornment = boxHandleAdornment}
 end
 
-local function GetVisibleEdges(corners)
-    -- Convert 3D points to 2D screen space
-    local screenPoints = {}
-    local allVisible = true
+local function Draw3DText(text, position, color, size, parentGui)
+    local billboard = Instance.new("BillboardGui")
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = position
+    billboard.Adornee = parentGui
+    billboard.Parent = parentGui
     
-    for i, corner in ipairs(corners) do
-        local screenPoint, onScreen = Camera:WorldToViewportPoint(corner.Position)
-        screenPoints[i] = Vector2.new(screenPoint.X, screenPoint.Y)
-        if not onScreen then allVisible = false end
-    end
+    local textLabel = Instance.new("TextLabel")
+    textLabel.BackgroundTransparency = 1
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.Text = text
+    textLabel.TextColor3 = color
+    textLabel.TextSize = size
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.TextStrokeTransparency = 0
+    textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+    textLabel.Parent = billboard
     
-    if not allVisible then return {} end
-    
-    -- Define edges (pairs of point indices)
-    local edges = {
-        -- Front face
-        {1, 2}, {2, 3}, {3, 4}, {4, 1},
-        -- Back face
-        {5, 6}, {6, 7}, {7, 8}, {8, 5},
-        -- Connecting edges
-        {1, 5}, {2, 6}, {3, 7}, {4, 8}
-    }
-    
-    return edges, screenPoints
+    return billboard
 end
 
 -- Update functions
 local function UpdateSkeleton(plr, skeleton)
-    if not ESP_SETTINGS.MasterSwitch then
-        for _, drawing in pairs(skeleton) do
-            if drawing then drawing.Visible = false end
+    if not ESP_SETTINGS.Enabled then
+        for _, obj in pairs(skeleton) do
+            if obj.Adornment then obj.Adornment:Destroy() end
+            if obj.Part then obj.Part:Destroy() end
+            if obj.Billboard then obj.Billboard:Destroy() end
         end
         return
     end
 
     local character = plr.Character
     if not character or not character:FindFirstChild("HumanoidRootPart") then
-        for _, drawing in pairs(skeleton) do
-            if drawing then drawing.Visible = false end
+        for _, obj in pairs(skeleton) do
+            if obj.Adornment then obj.Adornment:Destroy() end
+            if obj.Part then obj.Part:Destroy() end
+            if obj.Billboard then obj.Billboard:Destroy() end
         end
         return
     end
 
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
+
+    -- Create parent GUI if not exists
+    if not skeleton.ParentGui then
+        skeleton.ParentGui = Instance.new("Folder")
+        skeleton.ParentGui.Name = plr.Name.."_ESP"
+        skeleton.ParentGui.Parent = workspace
+    end
+
+    -- Clear old drawings
+    for _, obj in pairs(skeleton) do
+        if obj.Adornment then obj.Adornment:Destroy() end
+        if obj.Part then obj.Part:Destroy() end
+        if obj.Billboard then obj.Billboard:Destroy() end
+    end
+    skeleton.Drawing = {}
 
     -- Skeleton update
     if ESP_SETTINGS.Components.Skeleton.Enabled then
@@ -235,59 +209,22 @@ local function UpdateSkeleton(plr, skeleton)
         for index, connection in ipairs(connections) do
             local jointA = jointObjects[connection[1]]
             local jointB = jointObjects[connection[2]]
-            local lineKey = "line_"..index
 
             if jointA and jointB then
-                local posA, onScreenA = Camera:WorldToViewportPoint(jointA.Position)
-                local posB, onScreenB = Camera:WorldToViewportPoint(jointB.Position)
-
-                local line = GetCachedDrawing("Line", lineKey, skeleton, {
-                    Color = GetPlayerColor(plr, "Skeleton"),
-                    Thickness = ESP_SETTINGS.Components.Skeleton.Thickness
-                })
-
-                if onScreenA and onScreenB and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or 
-                    (IsPartVisible(jointA, character) and IsPartVisible(jointB, character))) then
-                    line.From = Vector2.new(posA.X, posA.Y)
-                    line.To = Vector2.new(posB.X, posB.Y)
-                    line.Visible = true
-                else
-                    line.Visible = false
-                end
-            elseif skeleton[lineKey] then
-                skeleton[lineKey].Visible = false
-            end
-        end
-
-        -- Head circle
-        if ESP_SETTINGS.Components.Skeleton.HeadCircle.Enabled then
-            local head = jointObjects.Head
-            if head then
-                local headPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                local distance = (head.Position - Camera.CFrame.Position).Magnitude
-
-                local headCircle = GetCachedDrawing("Circle", "headCircle", skeleton, {
-                    Color = GetPlayerColor(plr, "Skeleton"),
-                    Thickness = ESP_SETTINGS.Components.Skeleton.HeadCircle.Thickness,
-                    Filled = false
-                })
-
-                if ESP_SETTINGS.Components.Skeleton.HeadCircle.DynamicSize then
-                    local size = ESP_SETTINGS.Components.Skeleton.HeadCircle.BaseSize / (distance * 0.1)
-                    headCircle.Radius = math.max(size, ESP_SETTINGS.Components.Skeleton.HeadCircle.MinSize)
-                else
-                    headCircle.Radius = 8
-                end
-
-                if onScreen and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or IsPartVisible(head, character)) then
-                    headCircle.Position = Vector2.new(headPos.X, headPos.Y)
-                    headCircle.Visible = true
-                else
-                    headCircle.Visible = false
+                local visible = not ESP_SETTINGS.Components.Skeleton.VisibleOnly or 
+                               (IsPartVisible(jointA, character) and IsPartVisible(jointB, character))
+                
+                if visible then
+                    local line = Draw3DLine(
+                        jointA.Position,
+                        jointB.Position,
+                        GetPlayerColor(plr, "Skeleton"),
+                        ESP_SETTINGS.Components.Skeleton.Thickness,
+                        skeleton.ParentGui
+                    )
+                    table.insert(skeleton.Drawing, line)
                 end
             end
-        elseif skeleton.headCircle then
-            skeleton.headCircle.Visible = false
         end
     end
 
@@ -295,154 +232,84 @@ local function UpdateSkeleton(plr, skeleton)
     if ESP_SETTINGS.Components.Box.Enabled then
         local rootPart = character:FindFirstChild("HumanoidRootPart")
         if rootPart then
-            local rootPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
+            local visible = not ESP_SETTINGS.Components.Box.VisibleOnly or IsPartVisible(rootPart, character)
+            
+            if visible then
+                local torsoName = humanoid.RigType == Enum.HumanoidRigType.R15 and "UpperTorso" or "Torso"
+                local torso = character:FindFirstChild(torsoName)
+                local head = character:FindFirstChild("Head")
 
-            if onScreen and (not ESP_SETTINGS.Components.Box.VisibleOnly or IsPartVisible(rootPart, character)) then
-                if ESP_SETTINGS.BoxType == "2D" then
-                    -- 2D Box
-                    local head = character:FindFirstChild("Head")
-                    local torsoName = humanoid.RigType == Enum.HumanoidRigType.R15 and "UpperTorso" or "Torso"
-                    local torso = character:FindFirstChild(torsoName)
+                if torso and head then
+                    local height = (head.Position - torso.Position).Magnitude * 2.5
+                    local width = math.max(head.Size.X, torso.Size.X) * 2
+                    local depth = width * 0.6
 
-                    if head and torso then
-                        local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, head.Size.Y/2 + 0.2, 0))
-                        local torsoPos = Camera:WorldToViewportPoint(torso.Position - Vector3.new(0, torso.Size.Y, 0))
+                    local cf = rootPart.CFrame
+                    local size = Vector3.new(width, height, depth)
 
-                        local width = math.max(head.Size.X, torso.Size.X) * 2.5
-                        local height = torsoPos.Y - headPos.Y
+                    -- Get all 8 corners of the 3D box
+                    local corners = {
+                        cf * CFrame.new(size.X/2, size.Y/2, size.Z/2).Position,
+                        cf * CFrame.new(-size.X/2, size.Y/2, size.Z/2).Position,
+                        cf * CFrame.new(-size.X/2, -size.Y/2, size.Z/2).Position,
+                        cf * CFrame.new(size.X/2, -size.Y/2, size.Z/2).Position,
+                        cf * CFrame.new(size.X/2, size.Y/2, -size.Z/2).Position,
+                        cf * CFrame.new(-size.X/2, size.Y/2, -size.Z/2).Position,
+                        cf * CFrame.new(-size.X/2, -size.Y/2, -size.Z/2).Position,
+                        cf * CFrame.new(size.X/2, -size.Y/2, -size.Z/2).Position
+                    }
 
-                        local topLeft = Vector2.new(headPos.X - width/2, headPos.Y)
-                        local topRight = Vector2.new(headPos.X + width/2, headPos.Y)
-                        local bottomLeft = Vector2.new(torsoPos.X - width/2, torsoPos.Y)
-                        local bottomRight = Vector2.new(torsoPos.X + width/2, torsoPos.Y)
+                    -- Define edges (pairs of point indices)
+                    local edges = {
+                        -- Front face
+                        {1, 2}, {2, 3}, {3, 4}, {4, 1},
+                        -- Back face
+                        {5, 6}, {6, 7}, {7, 8}, {8, 5},
+                        -- Connecting edges
+                        {1, 5}, {2, 6}, {3, 7}, {4, 8}
+                    }
 
-                        local boxQuad = GetCachedDrawing("Quad", "boxQuad", skeleton, {
-                            Color = GetPlayerColor(plr, "Box"),
-                            Thickness = ESP_SETTINGS.Components.Box.Thickness,
-                            Filled = ESP_SETTINGS.Components.Box.FillTransparency < 1,
-                            Transparency = ESP_SETTINGS.Components.Box.FillTransparency
-                        })
-
-                        boxQuad.PointA = topLeft
-                        boxQuad.PointB = topRight
-                        boxQuad.PointC = bottomRight
-                        boxQuad.PointD = bottomLeft
-                        boxQuad.Visible = true
-
-                        -- Outline
-                        local outlineQuad = GetCachedDrawing("Quad", "outlineQuad", skeleton, {
-                            Color = Color3.new(0,0,0),
-                            Thickness = ESP_SETTINGS.Components.Box.Thickness + 1,
-                            Filled = false
-                        })
-
-                        outlineQuad.PointA = topLeft - Vector2.new(1,1)
-                        outlineQuad.PointB = topRight + Vector2.new(1,-1)
-                        outlineQuad.PointC = bottomRight + Vector2.new(1,1)
-                        outlineQuad.PointD = bottomLeft + Vector2.new(-1,1)
-                        outlineQuad.Visible = true
-                    end
-                else
-                    -- Improved 3D Box
-                    local torsoName = humanoid.RigType == Enum.HumanoidRigType.R15 and "UpperTorso" or "Torso"
-                    local torso = character:FindFirstChild(torsoName)
-                    local head = character:FindFirstChild("Head")
-
-                    if torso and head then
-                        local height = (head.Position - torso.Position).Magnitude * 2.5
-                        local width = math.max(head.Size.X, torso.Size.X) * 2
-                        local depth = width * 0.6
-
-                        local cf = rootPart.CFrame
-                        local size = Vector3.new(width, height, depth)
-
-                        -- Get all 8 corners of the 3D box
-                        local corners = GetCorners(cf, size)
-                        
-                        -- Get visible edges and their screen points
-                        local edges, screenPoints = GetVisibleEdges(corners)
-                        
-                        -- Draw all visible edges
-                        for i, edge in ipairs(edges) do
-                            local line = GetCachedDrawing("Line", "box3d_line_"..i, skeleton, {
-                                Color = GetPlayerColor(plr, "Box"),
-                                Thickness = ESP_SETTINGS.Components.Box.Thickness
-                            })
-                            
-                            line.From = screenPoints[edge[1]]
-                            line.To = screenPoints[edge[2]]
-                            line.Visible = true
-                        end
-                        
-                        -- Hide any extra lines we might have from previous frames
-                        for i = #edges + 1, 12 do
-                            local line = skeleton["box3d_line_"..i]
-                            if line then
-                                line.Visible = false
-                            end
-                        end
+                    -- Draw all edges
+                    for _, edge in ipairs(edges) do
+                        local line = Draw3DLine(
+                            corners[edge[1]],
+                            corners[edge[2]],
+                            GetPlayerColor(plr, "Box"),
+                            ESP_SETTINGS.Components.Box.Thickness,
+                            skeleton.ParentGui
+                        )
+                        table.insert(skeleton.Drawing, line)
                     end
                 end
-            else
-                -- Hide all box lines if not on screen
-                for i = 1, 12 do
-                    local line = skeleton["box3d_line_"..i]
-                    if line then
-                        line.Visible = false
-                    end
-                end
-                
-                local quad = skeleton["boxQuad"]
-                if quad then quad.Visible = false end
-                local outline = skeleton["outlineQuad"]
-                if outline then outline.Visible = false end
             end
         end
-    else
-        -- Hide all box lines if box ESP is disabled
-        for i = 1, 12 do
-            local line = skeleton["box3d_line_"..i]
-            if line then
-                line.Visible = false
-            end
-        end
-        
-        local quad = skeleton["boxQuad"]
-        if quad then quad.Visible = false end
-        local outline = skeleton["outlineQuad"]
-        if outline then outline.Visible = false end
     end
 
     -- Name and distance
     if ESP_SETTINGS.Components.Name.Enabled then
         local head = character:FindFirstChild("Head")
         if head then
-            local headPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+            local visible = not ESP_SETTINGS.Components.Name.VisibleOnly or IsPartVisible(head, character)
+            
+            if visible then
+                local distanceText = ""
+                if ESP_SETTINGS.Components.Name.ShowDistance then
+                    local distance = (head.Position - Camera.CFrame.Position).Magnitude
+                    distanceText = string.format(" [%d]", math.floor(distance))
+                end
 
-            local nameText = GetCachedDrawing("Text", "nameText", skeleton, {
-                Color = GetPlayerColor(plr, "Name"),
-                Size = ESP_SETTINGS.Components.Name.Size,
-                Outline = ESP_SETTINGS.Components.Name.Outline,
-                OutlineColor = ESP_SETTINGS.Components.Name.OutlineColor,
-                Center = true
-            })
-
-            local distanceText = ""
-            if ESP_SETTINGS.Components.Name.ShowDistance then
-                local distance = (head.Position - Camera.CFrame.Position).Magnitude
-                distanceText = string.format(" [%d]", math.floor(distance))
-            end
-
-            nameText.Text = plr.Name .. distanceText
-
-            if onScreen then
-                nameText.Position = Vector2.new(
-                    headPos.X + ESP_SETTINGS.Components.Name.Offset.X,
-                    headPos.Y + ESP_SETTINGS.Components.Name.Offset.Y
+                local textPos = ESP_SETTINGS.Components.Name.Offset
+                local offset = head.CFrame:VectorToWorldSpace(textPos)
+                
+                local billboard = Draw3DText(
+                    plr.Name .. distanceText,
+                    textPos,
+                    GetPlayerColor(plr, "Name"),
+                    ESP_SETTINGS.Components.Name.Size,
+                    skeleton.ParentGui
                 )
-                nameText.Visible = true
-            else
-                nameText.Visible = false
+                
+                table.insert(skeleton.Drawing, {Billboard = billboard})
             end
         end
     end
@@ -452,7 +319,9 @@ end
 local function TrackPlayer(plr)
     if plr == LocalPlayer then return end
 
-    local skeleton = {}
+    local skeleton = {
+        Drawing = {}
+    }
     Skeletons[plr] = skeleton
 
     local connection
@@ -463,15 +332,17 @@ local function TrackPlayer(plr)
     plr.AncestryChanged:Connect(function(_, parent)
         if not parent then
             connection:Disconnect()
-            RemoveSkeleton(skeleton)
+            if skeleton.ParentGui then
+                skeleton.ParentGui:Destroy()
+            end
             Skeletons[plr] = nil
         end
     end)
 end
 
 -- API
-function ESP:ToggleMaster(state)
-    ESP_SETTINGS.MasterSwitch = state
+function ESP:Toggle(state)
+    ESP_SETTINGS.Enabled = state
     self:UpdateAll()
 end
 
@@ -487,11 +358,6 @@ end
 
 function ESP:ToggleBox(state)
     ESP_SETTINGS.Components.Box.Enabled = state
-    self:UpdateAll()
-end
-
-function ESP:SetBoxType(type)
-    ESP_SETTINGS.BoxType = type
     self:UpdateAll()
 end
 
@@ -519,42 +385,15 @@ end
 -- Initialization
 Players.PlayerAdded:Connect(TrackPlayer)
 Players.PlayerRemoving:Connect(function(plr)
-    RemoveSkeleton(Skeletons[plr])
+    local skeleton = Skeletons[plr]
+    if skeleton and skeleton.ParentGui then
+        skeleton.ParentGui:Destroy()
+    end
     Skeletons[plr] = nil
 end)
 
 for _, plr in ipairs(Players:GetPlayers()) do
     TrackPlayer(plr)
 end
-
--- Metatable for easy access
-setmetatable(ESP, {
-    __index = function(t, k)
-        if k == "Enabled" then
-            return ESP_SETTINGS.MasterSwitch
-        elseif k == "SkeletonEnabled" then
-            return ESP_SETTINGS.Components.Skeleton.Enabled
-        elseif k == "NamesEnabled" then
-            return ESP_SETTINGS.Components.Name.Enabled
-        elseif k == "BoxEnabled" then
-            return ESP_SETTINGS.Components.Box.Enabled
-        elseif k == "BoxType" then
-            return ESP_SETTINGS.BoxType
-        end
-    end,
-    __newindex = function(t, k, v)
-        if k == "Enabled" then
-            ESP:ToggleMaster(v)
-        elseif k == "SkeletonEnabled" then
-            ESP:ToggleSkeleton(v)
-        elseif k == "NamesEnabled" then
-            ESP:ToggleNames(v)
-        elseif k == "BoxEnabled" then
-            ESP:ToggleBox(v)
-        elseif k == "BoxType" then
-            ESP:SetBoxType(v)
-        end
-    end
-})
 
 return ESP
