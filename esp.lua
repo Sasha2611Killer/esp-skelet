@@ -18,22 +18,31 @@ local bones = {
 -- Настройки ESP
 local ESP_SETTINGS = {
 	BoxColor = Color3.new(1, 1, 1),
-	NameColor = Color3.new(1, 1, 1),
 	HealthHighColor = Color3.new(0, 1, 0),
 	HealthLowColor = Color3.new(1, 0, 0),
 	Teamcheck = false,
 	WallCheck = false,
 	Enabled = false,
 	ShowBox = false,
-	ShowName = false,
 	ShowHealth = false,
-	ShowDistance = false,
 	ShowSkeletons = false,
 	ShowTracer = false,
 	TracerColor = Color3.new(1, 1, 1), 
 	TracerThickness = 2,
 	SkeletonsColor = Color3.new(1, 1, 1),
 	TracerPosition = "Bottom",
+
+	Components = {
+		Name = {
+			Enabled = false,
+			Color = Color3.new(1, 1, 1),
+			ShowDistance = true,
+			Size = 14,
+			Outline = true,
+			OutlineColor = Color3.new(0, 0, 0),
+			Offset = Vector2.new(0, -30)
+		}
+	}
 }
 
 -- Функция для создания Drawing объектов
@@ -48,13 +57,15 @@ end
 -- Создание ESP для игрока
 local function createEsp(player)
 	local esp = {
-		name = create("Text", {
-			Color = ESP_SETTINGS.NameColor,
-			Outline = true,
+		nameText = create("Text", {
+			Color = ESP_SETTINGS.Components.Name.Color,
+			Size = ESP_SETTINGS.Components.Name.Size,
+			Outline = ESP_SETTINGS.Components.Name.Outline,
+			OutlineColor = ESP_SETTINGS.Components.Name.OutlineColor,
 			Center = true,
-			Size = 13,
 			Visible = false
 		}),
+		-- остальные элементы остаются без изменений
 		health = create("Line", {
 			Thickness = 1,
 			Visible = false
@@ -88,6 +99,7 @@ local function createEsp(player)
 
 	cache[player] = esp
 end
+
 
 -- Проверка, находится ли игрок за стеной
 local function isPlayerBehindWall(player)
@@ -133,9 +145,9 @@ local function update3DBox(esp, character)
 	if not humanoid then return false end
 
 	-- Базовые размеры (можно настроить под вашу игру)
-	local width = 2.2  -- Ширина (X)
-	local height = humanoid.HipHeight * 2  -- Высота (Y)
-	local depth = 2.0  -- Глубина (Z)
+	local width = 2  -- Ширина (X)
+	local height = humanoid.HipHeight * 1.5  -- Высота (Y)
+	local depth = 1.5  -- Глубина (Z)
 
 	-- Корректируем размеры для разных типов персонажей
 	if humanoid.RigType == Enum.HumanoidRigType.R6 then
@@ -258,21 +270,35 @@ local function updateEsp()
 					local boxSize = Vector2.new(50, 80)
 
 					-- Имя игрока (теперь используем позицию головы)
-					if ESP_SETTINGS.ShowName then
-						local distanceText = ""
-						if ESP_SETTINGS.ShowDistance then
-							local distance = (head.Position - camera.CFrame.Position).Magnitude
-							distanceText = string.format(" [%d]", math.floor(distance))
-						end
+					if ESP_SETTINGS.Components.Name.Enabled then
+						local head = character:FindFirstChild("Head")
+						if head then
+							local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
 
-						esp.name.Text = player.Name .. distanceText
-						esp.name.Position = Vector2.new(
-							head2D.X, 
-							head2D.Y - 25 -- Смещаем чуть выше головы
-						)
-						esp.name.Visible = true
+							local distanceText = ""
+							if ESP_SETTINGS.Components.Name.ShowDistance then
+								local distance = (head.Position - camera.CFrame.Position).Magnitude
+								distanceText = string.format(" [%d]", math.floor(distance))
+							end
+
+							esp.nameText.Text = player.Name .. distanceText
+							esp.nameText.Color = ESP_SETTINGS.Components.Name.Color
+							esp.nameText.OutlineColor = ESP_SETTINGS.Components.Name.OutlineColor
+
+							if onScreen then
+								esp.nameText.Position = Vector2.new(
+									headPos.X + ESP_SETTINGS.Components.Name.Offset.X,
+									headPos.Y + ESP_SETTINGS.Components.Name.Offset.Y
+								)
+								esp.nameText.Visible = true
+							else
+								esp.nameText.Visible = false
+							end
+						end
 					else
-						esp.name.Visible = false
+						if esp.nameText then
+							esp.nameText.Visible = false
+						end
 					end
 
 					-- 3D Бокс
