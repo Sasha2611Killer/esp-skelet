@@ -191,37 +191,37 @@ local function updateSkeleton(plr, skeleton)
 		end
 
 		if ESP_SETTINGS.Components.Skeleton.HeadCircle.Enabled then
-            local head = joints.Head
-            if head then
-                local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
-                local distance = (head.Position - camera.CFrame.Position).Magnitude
+			local head = joints.Head
+			if head then
+				local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
 
-                local headCircle = skeleton.headCircle or createCircle()
-                skeleton.headCircle = headCircle
+				local headCircle = skeleton.headCircle or createCircle()
+				skeleton.headCircle = headCircle
 
-                headCircle.Color = getPlayerColor(plr, true)
-                headCircle.Thickness = ESP_SETTINGS.Components.Skeleton.HeadCircle.Thickness
+				headCircle.Color = getPlayerColor(plr, true)
+				headCircle.Thickness = ESP_SETTINGS.Components.Skeleton.HeadCircle.Thickness
 
-                -- Динамический размер кружка
-                if ESP_SETTINGS.Components.Skeleton.HeadCircle.DynamicSize then
-                    local size = ESP_SETTINGS.Components.Skeleton.HeadCircle.BaseSize / (distance * 0.1)
-                    size = math.max(size, ESP_SETTINGS.Components.Skeleton.HeadCircle.MinSize)
-                    headCircle.Radius = size
-                else
-                    headCircle.Radius = 8
-                end
+				-- Используем фиксированный радиус
+				headCircle.Radius = 8  -- Размер выбирается вручную, экспериментально подобрать нужный размер
 
-                if onScreen and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or isPartVisible(head)) then
-                    headCircle.Position = Vector2.new(headPos.X, headPos.Y)
-                    headCircle.Visible = true
-                else
-                    headCircle.Visible = false
-                end
-            end
-        elseif skeleton.headCircle then
-            skeleton.headCircle.Visible = false
-        end
-    end
+				if onScreen and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or isPartVisible(head)) then
+					headCircle.Position = Vector2.new(headPos.X, headPos.Y)
+					headCircle.Visible = true
+				else
+					headCircle.Visible = false
+				end
+			end
+		elseif skeleton.headCircle then
+			skeleton.headCircle.Visible = false
+		end
+	else
+		-- Скрываем скелет если он отключен
+		for k, drawing in pairs(skeleton) do
+			if type(k) == "string" and (k:find("line_") or k == "headCircle") then
+				drawing.Visible = false
+			end
+		end
+	end
 
 	-- Обновление имени и дистанции
 	if ESP_SETTINGS.Components.Name.Enabled then
