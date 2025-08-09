@@ -245,20 +245,31 @@ local function updateEsp()
 		if shouldShow then
 			local rootPart = character:FindFirstChild("HumanoidRootPart")
 			local humanoid = character:FindFirstChild("Humanoid")
+			local head = character:FindFirstChild("Head") -- Добавляем поиск головы
 
-			if rootPart and humanoid then
-				local position, onScreen = camera:WorldToViewportPoint(rootPart.Position)
+			if rootPart and humanoid and head then -- Проверяем наличие головы
+				local headPos, headOnScreen = camera:WorldToViewportPoint(head.Position) -- Позиция головы
+				local rootPos, rootOnScreen = camera:WorldToViewportPoint(rootPart.Position)
 
-				if onScreen then
+				if headOnScreen then
 					-- Обновляем позицию и размеры
-					local hrp2D = Vector2.new(position.X, position.Y)
-					local boxSize = Vector2.new(50, 80) -- Фиксированный размер для упрощения
-					local boxPosition = Vector2.new(hrp2D.X - boxSize.X / 2, hrp2D.Y - boxSize.Y / 2)
+					local head2D = Vector2.new(headPos.X, headPos.Y)
+					local root2D = Vector2.new(rootPos.X, rootPos.Y)
+					local boxSize = Vector2.new(50, 80)
 
-					-- Имя игрока
+					-- Имя игрока (теперь используем позицию головы)
 					if ESP_SETTINGS.ShowName then
-						esp.name.Text = player.Name
-						esp.name.Position = Vector2.new(hrp2D.X, boxPosition.Y - 20)
+						local distanceText = ""
+						if ESP_SETTINGS.ShowDistance then
+							local distance = (head.Position - camera.CFrame.Position).Magnitude
+							distanceText = string.format(" [%d]", math.floor(distance))
+						end
+
+						esp.name.Text = player.Name .. distanceText
+						esp.name.Position = Vector2.new(
+							head2D.X, 
+							head2D.Y - 25 -- Смещаем чуть выше головы
+						)
 						esp.name.Visible = true
 					else
 						esp.name.Visible = false
@@ -283,7 +294,8 @@ local function updateEsp()
 						local healthPercentage = humanoid.Health / humanoid.MaxHealth
 						local healthColor = ESP_SETTINGS.HealthLowColor:Lerp(ESP_SETTINGS.HealthHighColor, healthPercentage)
 
-						esp.health.From = Vector2.new(boxPosition.X - 8, boxPosition.Y + boxSize.Y)
+						local healthBarY = root2D.Y + boxSize.Y/2
+						esp.health.From = Vector2.new(root2D.X - boxSize.X/2 - 8, healthBarY)
 						esp.health.To = Vector2.new(esp.health.From.X, esp.health.From.Y - boxSize.Y * healthPercentage)
 						esp.health.Color = healthColor
 						esp.health.Visible = true
@@ -291,11 +303,11 @@ local function updateEsp()
 						esp.health.Visible = false
 					end
 
-					-- Дистанция
-					if ESP_SETTINGS.ShowDistance then
+					-- Дистанция (теперь уже включена в имя)
+					if ESP_SETTINGS.ShowDistance and not ESP_SETTINGS.ShowName then
 						local distance = (camera.CFrame.p - rootPart.Position).Magnitude
 						esp.distance.Text = string.format("%.1f studs", distance)
-						esp.distance.Position = Vector2.new(hrp2D.X, boxPosition.Y + boxSize.Y + 5)
+						esp.distance.Position = Vector2.new(root2D.X, root2D.Y + boxSize.Y/2 + 5)
 						esp.distance.Visible = true
 					else
 						esp.distance.Visible = false
@@ -318,7 +330,7 @@ local function updateEsp()
 							camera.ViewportSize.Y
 
 						esp.tracer.From = Vector2.new(camera.ViewportSize.X / 2, tracerY)
-						esp.tracer.To = hrp2D
+						esp.tracer.To = root2D
 						esp.tracer.Visible = true
 					else
 						esp.tracer.Visible = false
@@ -336,7 +348,7 @@ local function updateEsp()
 					end
 				end
 			else
-				-- Нет rootPart или humanoid - скрываем все
+				-- Нет нужных частей - скрываем все
 				for _, drawing in pairs(esp) do
 					if typeof(drawing) == "table" then
 						for _, line in ipairs(drawing) do
@@ -361,7 +373,6 @@ local function updateEsp()
 		end
 	end
 end
-
 -- Инициализация ESP для существующих игроков
 for _, player in ipairs(Players:GetPlayers()) do
 	if player ~= localPlayer then
