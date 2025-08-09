@@ -5,22 +5,32 @@ local RunService = game:GetService("RunService")
 local camera = workspace.CurrentCamera
 
 local ESP_SETTINGS = {
-    Enabled = false,               -- Включен ли ESP
-    Color = Color3.new(0, 1, 0),  -- Зеленый цвет
-    Thickness = 2,                -- Толщина линий
-    TeamCheck = true,             -- Проверка команд
-    VisibleOnly = false,          -- Всегда показывать
-    HeadCircle = true,            -- Показывать круг вокруг головы
-    HeadCircleBaseRadius = 15,    -- Базовый радиус на близком расстоянии
-    HeadCircleMinRadius = 3,      -- Минимальный радиус на дальнем расстоянии
-    HeadCircleMaxDistance = 100,  -- Дистанция, после которой радиус не уменьшается
-    HeadCircleThickness = 2       -- Толщина круга головы
+    Enabled = true,                -- Главный переключатель ESP
+    Skeleton = {
+        Enabled = true,            -- Включить скелет
+        Color = Color3.new(1, 0, 0), -- Красный цвет скелета
+        Thickness = 2,             -- Толщина линий
+        TeamCheck = false,         -- Использовать цвет команды
+        VisibleOnly = false,       -- Показывать только видимых игроков
+        HeadCircle = true,         -- Круг вокруг головы
+        HeadCircleRadius = 15,     -- Радиус круга
+        HeadCircleThickness = 2    -- Толщина круга
+    },
+    Name = {
+        Enabled = true,            -- Включить имена
+        Color = Color3.new(1, 1, 1), -- Белый цвет текста
+        ShowDistance = true,       -- Показывать дистанцию
+        Size = 14,                 -- Размер текста
+        Outline = true,            -- Обводка текста
+        OutlineColor = Color3.new(0, 0, 0), -- Черная обводка
+        Offset = Vector2.new(0, -30) -- Смещение текста
+    }
 }
 
 local player = Players.LocalPlayer
 local skeletons = {}
 
--- Создание новой линии
+-- Создание Drawing объектов
 local function createLine()
     local line = Drawing.new("Line")
     line.Visible = false
@@ -28,13 +38,20 @@ local function createLine()
     return line
 end
 
--- Создание нового круга
 local function createCircle()
     local circle = Drawing.new("Circle")
     circle.Visible = false
     circle.ZIndex = 10
     circle.Filled = false
     return circle
+end
+
+local function createText()
+    local text = Drawing.new("Text")
+    text.Visible = false
+    text.ZIndex = 10
+    text.Center = true
+    return text
 end
 
 -- Удаление скелета
@@ -47,7 +64,7 @@ local function removeSkeleton(skeleton)
     end
 end
 
--- Проверка видимости части
+-- Проверка видимости
 local function isPartVisible(part)
     if not part then return false end
     local cameraPos = camera.CFrame.Position
@@ -57,7 +74,16 @@ local function isPartVisible(part)
     return hit == nil or hit:IsDescendantOf(part.Parent)
 end
 
--- Обновление скелета игрока
+-- Получение цвета для игрока
+local function getPlayerColor(plr, forSkeleton)
+    local settings = forSkeleton and ESP_SETTINGS.Skeleton or ESP_SETTINGS.Name
+    if forSkeleton and ESP_SETTINGS.Skeleton.TeamCheck and plr.Team then
+        return plr.TeamColor.Color
+    end
+    return settings.Color
+end
+
+-- Обновление ESP
 local function updateSkeleton(plr, skeleton)
     if not ESP_SETTINGS.Enabled then
         for _, drawing in pairs(skeleton) do
@@ -77,115 +103,154 @@ local function updateSkeleton(plr, skeleton)
     local humanoid = character:FindFirstChild("Humanoid")
     if not humanoid then return end
 
-    local joints = {}
-    local connections = {}
+    -- Обновление скелета
+    if ESP_SETTINGS.Skeleton.Enabled then
+        local joints = {}
+        local connections = {}
 
-    -- Определяем соединения для R15 и R6
-    if humanoid.RigType == Enum.HumanoidRigType.R15 then
-        joints = {
-            Head = character:FindFirstChild("Head"),
-            UpperTorso = character:FindFirstChild("UpperTorso"),
-            LowerTorso = character:FindFirstChild("LowerTorso"),
-            LeftUpperArm = character:FindFirstChild("LeftUpperArm"),
-            LeftLowerArm = character:FindFirstChild("LeftLowerArm"),
-            LeftHand = character:FindFirstChild("LeftHand"),
-            RightUpperArm = character:FindFirstChild("RightUpperArm"),
-            RightLowerArm = character:FindFirstChild("RightLowerArm"),
-            RightHand = character:FindFirstChild("RightHand"),
-            LeftUpperLeg = character:FindFirstChild("LeftUpperLeg"),
-            LeftLowerLeg = character:FindFirstChild("LeftLowerLeg"),
-            RightUpperLeg = character:FindFirstChild("RightUpperLeg"),
-            RightLowerLeg = character:FindFirstChild("RightLowerLeg"),
-        }
+        if humanoid.RigType == Enum.HumanoidRigType.R15 then
+            joints = {
+                Head = character:FindFirstChild("Head"),
+                UpperTorso = character:FindFirstChild("UpperTorso"),
+                LowerTorso = character:FindFirstChild("LowerTorso"),
+                LeftUpperArm = character:FindFirstChild("LeftUpperArm"),
+                LeftLowerArm = character:FindFirstChild("LeftLowerArm"),
+                LeftHand = character:FindFirstChild("LeftHand"),
+                RightUpperArm = character:FindFirstChild("RightUpperArm"),
+                RightLowerArm = character:FindFirstChild("RightLowerArm"),
+                RightHand = character:FindFirstChild("RightHand"),
+                LeftUpperLeg = character:FindFirstChild("LeftUpperLeg"),
+                LeftLowerLeg = character:FindFirstChild("LeftLowerLeg"),
+                RightUpperLeg = character:FindFirstChild("RightUpperLeg"),
+                RightLowerLeg = character:FindFirstChild("RightLowerLeg"),
+            }
 
-        connections = {
-            {"Head", "UpperTorso"},
-            {"UpperTorso", "LowerTorso"},
-            {"UpperTorso", "LeftUpperArm"},
-            {"LeftUpperArm", "LeftLowerArm"},
-            {"LeftLowerArm", "LeftHand"},
-            {"UpperTorso", "RightUpperArm"},
-            {"RightUpperArm", "RightLowerArm"},
-            {"RightLowerArm", "RightHand"},
-            {"LowerTorso", "LeftUpperLeg"},
-            {"LeftUpperLeg", "LeftLowerLeg"},
-            {"LowerTorso", "RightUpperLeg"},
-            {"RightUpperLeg", "RightLowerLeg"},
-        }
-    else
-        joints = {
-            Head = character:FindFirstChild("Head"),
-            Torso = character:FindFirstChild("Torso"),
-            LeftArm = character:FindFirstChild("Left Arm"),
-            RightArm = character:FindFirstChild("Right Arm"),
-            LeftLeg = character:FindFirstChild("Left Leg"),
-            RightLeg = character:FindFirstChild("Right Leg"),
-        }
+            connections = {
+                {"Head", "UpperTorso"},
+                {"UpperTorso", "LowerTorso"},
+                {"UpperTorso", "LeftUpperArm"},
+                {"LeftUpperArm", "LeftLowerArm"},
+                {"LeftLowerArm", "LeftHand"},
+                {"UpperTorso", "RightUpperArm"},
+                {"RightUpperArm", "RightLowerArm"},
+                {"RightLowerArm", "RightHand"},
+                {"LowerTorso", "LeftUpperLeg"},
+                {"LeftUpperLeg", "LeftLowerLeg"},
+                {"LowerTorso", "RightUpperLeg"},
+                {"RightUpperLeg", "RightLowerLeg"},
+            }
+        else
+            joints = {
+                Head = character:FindFirstChild("Head"),
+                Torso = character:FindFirstChild("Torso"),
+                LeftArm = character:FindFirstChild("Left Arm"),
+                RightArm = character:FindFirstChild("Right Arm"),
+                LeftLeg = character:FindFirstChild("Left Leg"),
+                RightLeg = character:FindFirstChild("Right Leg"),
+            }
 
-        connections = {
-            {"Head", "Torso"},
-            {"Torso", "LeftArm"},
-            {"Torso", "RightArm"},
-            {"Torso", "LeftLeg"},
-            {"Torso", "RightLeg"},
-        }
-    end
+            connections = {
+                {"Head", "Torso"},
+                {"Torso", "LeftArm"},
+                {"Torso", "RightArm"},
+                {"Torso", "LeftLeg"},
+                {"Torso", "RightLeg"},
+            }
+        end
 
-    -- Обработка соединений костей
-    for index, connection in ipairs(connections) do
-        local jointA = joints[connection[1]]
-        local jointB = joints[connection[2]]
+        for index, connection in ipairs(connections) do
+            local jointA = joints[connection[1]]
+            local jointB = joints[connection[2]]
 
-        if jointA and jointB then
-            local posA, onScreenA = camera:WorldToViewportPoint(jointA.Position)
-            local posB, onScreenB = camera:WorldToViewportPoint(jointB.Position)
+            if jointA and jointB then
+                local posA, onScreenA = camera:WorldToViewportPoint(jointA.Position)
+                local posB, onScreenB = camera:WorldToViewportPoint(jointB.Position)
 
-            local line = skeleton["line_"..index] or createLine()
-            skeleton["line_"..index] = line
+                local line = skeleton["line_"..index] or createLine()
+                skeleton["line_"..index] = line
 
-            line.Color = ESP_SETTINGS.Color
-            line.Thickness = ESP_SETTINGS.Thickness
+                line.Color = getPlayerColor(plr, true)
+                line.Thickness = ESP_SETTINGS.Skeleton.Thickness
 
-            if onScreenA and onScreenB and (not ESP_SETTINGS.VisibleOnly or (isPartVisible(jointA) and isPartVisible(jointB))) then
-                line.From = Vector2.new(posA.X, posA.Y)
-                line.To = Vector2.new(posB.X, posB.Y)
-                line.Visible = true
-            else
-                line.Visible = false
+                if onScreenA and onScreenB and (not ESP_SETTINGS.Skeleton.VisibleOnly or (isPartVisible(jointA) and isPartVisible(jointB))) then
+                    line.From = Vector2.new(posA.X, posA.Y)
+                    line.To = Vector2.new(posB.X, posB.Y)
+                    line.Visible = true
+                else
+                    line.Visible = false
+                end
+            elseif skeleton["line_"..index] then
+                skeleton["line_"..index].Visible = false
             end
-        elseif skeleton["line_"..index] then
-            skeleton["line_"..index].Visible = false
+        end
+
+        if ESP_SETTINGS.Skeleton.HeadCircle then
+            local head = joints.Head
+            if head then
+                local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
+                
+                local headCircle = skeleton.headCircle or createCircle()
+                skeleton.headCircle = headCircle
+                
+                headCircle.Color = getPlayerColor(plr, true)
+                headCircle.Thickness = ESP_SETTINGS.Skeleton.HeadCircleThickness
+                headCircle.Radius = ESP_SETTINGS.Skeleton.HeadCircleRadius
+                
+                if onScreen and (not ESP_SETTINGS.Skeleton.VisibleOnly or isPartVisible(head)) then
+                    headCircle.Position = Vector2.new(headPos.X, headPos.Y)
+                    headCircle.Visible = true
+                else
+                    headCircle.Visible = false
+                end
+            elseif skeleton.headCircle then
+                skeleton.headCircle.Visible = false
+            end
+        end
+    else
+        -- Скрываем скелет если он отключен
+        for k, drawing in pairs(skeleton) do
+            if type(k) == "string" and (k:find("line_") or k == "headCircle") then
+                drawing.Visible = false
+            end
         end
     end
 
-    -- Обработка круга вокруг головы с динамическим радиусом
-    if ESP_SETTINGS.HeadCircle then
-        local head = joints.Head
+    -- Обновление имени и дистанции
+    if ESP_SETTINGS.Name.Enabled then
+        local head = character:FindFirstChild("Head")
         if head then
             local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
             
-            -- Рассчитываем динамический радиус на основе расстояния
-            local distance = (head.Position - camera.CFrame.Position).Magnitude
-            local distanceFactor = math.clamp(distance / ESP_SETTINGS.HeadCircleMaxDistance, 0, 1)
-            local dynamicRadius = ESP_SETTINGS.HeadCircleBaseRadius * (1 - distanceFactor) + 
-                                ESP_SETTINGS.HeadCircleMinRadius * distanceFactor
+            local nameText = skeleton.nameText or createText()
+            skeleton.nameText = nameText
             
-            local headCircle = skeleton.headCircle or createCircle()
-            skeleton.headCircle = headCircle
+            nameText.Color = getPlayerColor(plr, false)
+            nameText.Size = ESP_SETTINGS.Name.Size
+            nameText.Outline = ESP_SETTINGS.Name.Outline
+            nameText.OutlineColor = ESP_SETTINGS.Name.OutlineColor
             
-            headCircle.Color = ESP_SETTINGS.Color
-            headCircle.Thickness = ESP_SETTINGS.HeadCircleThickness
-            headCircle.Radius = dynamicRadius
-            
-            if onScreen and (not ESP_SETTINGS.VisibleOnly or isPartVisible(head)) then
-                headCircle.Position = Vector2.new(headPos.X, headPos.Y)
-                headCircle.Visible = true
-            else
-                headCircle.Visible = false
+            local distanceText = ""
+            if ESP_SETTINGS.Name.ShowDistance then
+                local distance = (head.Position - camera.CFrame.Position).Magnitude
+                distanceText = string.format(" [%d]", math.floor(distance))
             end
-        elseif skeleton.headCircle then
-            skeleton.headCircle.Visible = false
+            
+            nameText.Text = plr.Name .. distanceText
+            
+            if onScreen and (not ESP_SETTINGS.Skeleton.VisibleOnly or isPartVisible(head)) then
+                nameText.Position = Vector2.new(
+                    headPos.X + ESP_SETTINGS.Name.Offset.X,
+                    headPos.Y + ESP_SETTINGS.Name.Offset.Y
+                )
+                nameText.Visible = true
+            else
+                nameText.Visible = false
+            end
+        elseif skeleton.nameText then
+            skeleton.nameText.Visible = false
         end
+    elseif skeleton.nameText then
+        skeleton.nameText.Visible = false
     end
 end
 
@@ -201,7 +266,6 @@ local function trackPlayer(plr)
         updateSkeleton(plr, skeleton)
     end)
 
-    -- Очистка при удалении игрока
     plr.AncestryChanged:Connect(function(_, parent)
         if not parent then
             connection:Disconnect()
@@ -211,7 +275,7 @@ local function trackPlayer(plr)
     end)
 end
 
--- Включение/выключение ESP
+-- API функции
 function ESP:Toggle(state)
     ESP_SETTINGS.Enabled = state
     for plr, skeleton in pairs(skeletons) do
@@ -219,9 +283,29 @@ function ESP:Toggle(state)
     end
 end
 
--- Включение/выключение круга головы
-function ESP:ToggleHeadCircle(state)
-    ESP_SETTINGS.HeadCircle = state
+function ESP:ToggleSkeleton(state)
+    ESP_SETTINGS.Skeleton.Enabled = state
+    for plr, skeleton in pairs(skeletons) do
+        updateSkeleton(plr, skeleton)
+    end
+end
+
+function ESP:ToggleNames(state)
+    ESP_SETTINGS.Name.Enabled = state
+    for plr, skeleton in pairs(skeletons) do
+        updateSkeleton(plr, skeleton)
+    end
+end
+
+function ESP:SetSkeletonColor(color)
+    ESP_SETTINGS.Skeleton.Color = color
+    for plr, skeleton in pairs(skeletons) do
+        updateSkeleton(plr, skeleton)
+    end
+end
+
+function ESP:SetNameColor(color)
+    ESP_SETTINGS.Name.Color = color
     for plr, skeleton in pairs(skeletons) do
         updateSkeleton(plr, skeleton)
     end
@@ -238,19 +322,24 @@ for _, plr in ipairs(Players:GetPlayers()) do
     trackPlayer(plr)
 end
 
--- Добавляем метатаблицу для ESP.Enabled
+-- Метатаблица для удобного доступа
 setmetatable(ESP, {
     __index = function(t, k)
         if k == "Enabled" then
             return ESP_SETTINGS.Enabled
+        elseif k == "SkeletonEnabled" then
+            return ESP_SETTINGS.Skeleton.Enabled
+        elseif k == "NamesEnabled" then
+            return ESP_SETTINGS.Name.Enabled
         end
     end,
     __newindex = function(t, k, v)
         if k == "Enabled" then
-            ESP_SETTINGS.Enabled = v
-            for plr, skeleton in pairs(skeletons) do
-                updateSkeleton(plr, skeleton)
-            end
+            ESP:Toggle(v)
+        elseif k == "SkeletonEnabled" then
+            ESP:ToggleSkeleton(v)
+        elseif k == "NamesEnabled" then
+            ESP:ToggleNames(v)
         end
     end
 })
