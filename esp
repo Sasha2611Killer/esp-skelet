@@ -5,11 +5,11 @@ local RunService = game:GetService("RunService")
 local camera = workspace.CurrentCamera
 
 local ESP_SETTINGS = {
-    MasterSwitch = true,           -- Главный переключатель (влияет на ВСЕ компоненты)
+    MasterSwitch = false,          -- Главный выключатель (по умолчанию выключен)
     Components = {
         Skeleton = {
-            Enabled = true,        -- Включить скелет
-            Color = Color3.new(1, 0, 0), -- Красный цвет
+            Enabled = false,       -- Скелет выключен по умолчанию
+            Color = Color3.new(1, 0, 0),
             Thickness = 2,
             TeamCheck = false,
             VisibleOnly = false,
@@ -18,8 +18,8 @@ local ESP_SETTINGS = {
             HeadCircleThickness = 2
         },
         Name = {
-            Enabled = true,        -- Включить имена
-            Color = Color3.new(1, 1, 1), -- Белый цвет
+            Enabled = false,        -- Имена выключены по умолчанию
+            Color = Color3.new(1, 1, 1),
             ShowDistance = true,
             Size = 14,
             Outline = true,
@@ -279,36 +279,34 @@ local function trackPlayer(plr)
 end
 
 -- API функции
-function ESP:Toggle(state)
+function ESP:ToggleMaster(state)
     ESP_SETTINGS.MasterSwitch = state
-    for plr, skeleton in pairs(skeletons) do
-        updateSkeleton(plr, skeleton)
-    end
+    self:UpdateAll()
 end
+
 
 function ESP:ToggleSkeleton(state)
     ESP_SETTINGS.Components.Skeleton.Enabled = state
-    for plr, skeleton in pairs(skeletons) do
-        updateSkeleton(plr, skeleton)
-    end
+    self:UpdateAll()
 end
 
 function ESP:ToggleNames(state)
     ESP_SETTINGS.Components.Name.Enabled = state
-    for plr, skeleton in pairs(skeletons) do
-        updateSkeleton(plr, skeleton)
-    end
+    self:UpdateAll()
 end
 
 function ESP:SetSkeletonColor(color)
     ESP_SETTINGS.Components.Skeleton.Color = color
-    for plr, skeleton in pairs(skeletons) do
-        updateSkeleton(plr, skeleton)
-    end
+    self:UpdateAll()
 end
 
 function ESP:SetNameColor(color)
     ESP_SETTINGS.Components.Name.Color = color
+    for plr, skeleton in pairs(skeletons) do
+        updateSkeleton(plr, skeleton)
+    end
+end
+function ESP:UpdateAll()
     for plr, skeleton in pairs(skeletons) do
         updateSkeleton(plr, skeleton)
     end
@@ -338,7 +336,7 @@ setmetatable(ESP, {
     end,
     __newindex = function(t, k, v)
         if k == "Enabled" then
-            ESP:Toggle(v)
+            ESP:ToggleMaster(v)
         elseif k == "SkeletonEnabled" then
             ESP:ToggleSkeleton(v)
         elseif k == "NamesEnabled" then
