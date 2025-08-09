@@ -247,4 +247,9 @@ end
 ESP:Init()
 
 -- Возвращаем объект ESP для внешнего доступа
-return ESP
+-- В самом конце скрипта добавьте:
+return {
+    Settings = ESP_SETTINGS,
+    Toggle = toggleESP,
+    ToggleHeadCircle = toggleHeadCircle
+}
