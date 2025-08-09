@@ -163,6 +163,7 @@ end
 
 -- Update functions
 local function UpdateSkeleton(plr, skeleton)
+    -- Master switch check moved to the beginning
     if not ESP_SETTINGS.MasterSwitch then
         for _, drawing in pairs(skeleton) do
             if drawing then drawing.Visible = false end
@@ -300,6 +301,7 @@ local function UpdateSkeleton(plr, skeleton)
     else
         if skeleton.nameText then
             skeleton.nameText.Visible = false
+            skeleton.nameText.Text = ""
         end
     end
 
@@ -308,7 +310,7 @@ local function UpdateSkeleton(plr, skeleton)
         local rootPart = character:FindFirstChild("HumanoidRootPart")
         if rootPart then
             local rootPos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
-            
+
             if onScreen and (not ESP_SETTINGS.Components.Box.VisibleOnly or IsPartVisible(rootPart, character)) then
                 local torsoName = humanoid.RigType == Enum.HumanoidRigType.R15 and "UpperTorso" or "Torso"
                 local torso = character:FindFirstChild(torsoName)
@@ -400,21 +402,44 @@ function ESP:ToggleMaster(state)
     ESP_SETTINGS.MasterSwitch = state
     if not state then
         for _, skeleton in pairs(Skeletons) do
-            RemoveSkeleton(skeleton)
+            for _, drawing in pairs(skeleton) do
+                if drawing then drawing.Visible = false end
+            end
         end
     end
 end
 
 function ESP:ToggleSkeleton(state)
     ESP_SETTINGS.Components.Skeleton.Enabled = state
+    if not state then
+        for _, skeleton in pairs(Skeletons) do
+            ClearComponent(skeleton, "line_")
+            if skeleton.headCircle then
+                skeleton.headCircle.Visible = false
+            end
+        end
+    end
 end
 
 function ESP:ToggleNames(state)
     ESP_SETTINGS.Components.Name.Enabled = state
+    if not state then
+        for _, skeleton in pairs(Skeletons) do
+            if skeleton.nameText then
+                skeleton.nameText.Visible = false
+                skeleton.nameText.Text = ""
+            end
+        end
+    end
 end
 
 function ESP:ToggleBox(state)
     ESP_SETTINGS.Components.Box.Enabled = state
+    if not state then
+        for _, skeleton in pairs(Skeletons) do
+            ClearComponent(skeleton, "box3d_line_")
+        end
+    end
 end
 
 setmetatable(ESP, {
