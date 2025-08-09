@@ -133,8 +133,8 @@ local function update3DBox(esp, character)
 	if not humanoid then return false end
 
 	-- Базовые размеры (можно настроить под вашу игру)
-	local width = 2.5  -- Ширина (X)
-	local height = humanoid.HipHeight * 2 + 0.5  -- Высота (Y)
+	local width = 2.2  -- Ширина (X)
+	local height = humanoid.HipHeight * 2  -- Высота (Y)
 	local depth = 2.0  -- Глубина (Z)
 
 	-- Корректируем размеры для разных типов персонажей
