@@ -1,33 +1,53 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local camera = workspace.CurrentCamera
-
-local ESP_SETTINGS = {
-    Enabled = false,               -- Включен ли ESP
-    Color = Color3.new(0, 1, 0),  -- Зеленый цвет
-    Thickness = 2,                -- Толщина линий
-    TeamCheck = true,             -- Проверка команд
-    VisibleOnly = false,          -- Всегда показывать
-    HeadCircle = true,            -- Показывать круг вокруг головы
-    HeadCircleBaseRadius = 15,    -- Базовый радиус на близком расстоянии
-    HeadCircleMinRadius = 3,      -- Минимальный радиус на дальнем расстоянии
-    HeadCircleMaxDistance = 100,  -- Дистанция, после которой радиус не уменьшается
-    HeadCircleThickness = 2       -- Толщина круга головы
+local ESP = {
+    Players = game:GetService("Players"),
+    RunService = game:GetService("RunService"),
+    camera = workspace.CurrentCamera,
+    
+    ESP_SETTINGS = {
+        Enabled = false,
+        Color = Color3.new(0, 1, 0),
+        Thickness = 2,
+        TeamCheck = true,
+        VisibleOnly = false,
+        HeadCircle = true,
+        HeadCircleBaseRadius = 15,
+        HeadCircleMinRadius = 3,
+        HeadCircleMaxDistance = 100,
+        HeadCircleThickness = 2
+    },
+    
+    player = nil,
+    skeletons = {}
 }
 
-local player = Players.LocalPlayer
-local skeletons = {}
+-- Инициализация
+function ESP:Init()
+    self.player = self.Players.LocalPlayer
+    
+    -- Подключаем обработчики игроков
+    self.Players.PlayerAdded:Connect(function(plr)
+        self:TrackPlayer(plr)
+    end)
+    
+    self.Players.PlayerRemoving:Connect(function(plr)
+        self:RemoveSkeleton(self.skeletons[plr])
+        self.skeletons[plr] = nil
+    end)
 
--- Создание новой линии
-local function createLine()
+    for _, plr in ipairs(self.Players:GetPlayers()) do
+        self:TrackPlayer(plr)
+    end
+end
+
+-- Создание элементов Drawing
+function ESP:CreateLine()
     local line = Drawing.new("Line")
     line.Visible = false
     line.ZIndex = 10
     return line
 end
 
--- Создание нового круга
-local function createCircle()
+function ESP:CreateCircle()
     local circle = Drawing.new("Circle")
     circle.Visible = false
     circle.ZIndex = 10
@@ -36,7 +56,7 @@ local function createCircle()
 end
 
 -- Удаление скелета
-local function removeSkeleton(skeleton)
+function ESP:RemoveSkeleton(skeleton)
     if not skeleton then return end
     for _, drawing in pairs(skeleton) do
         if drawing and drawing.Remove then
@@ -45,19 +65,19 @@ local function removeSkeleton(skeleton)
     end
 end
 
--- Проверка видимости части
-local function isPartVisible(part)
+-- Проверка видимости
+function ESP:IsPartVisible(part)
     if not part then return false end
-    local cameraPos = camera.CFrame.Position
+    local cameraPos = self.camera.CFrame.Position
     local partPos = part.Position
     local ray = Ray.new(cameraPos, (partPos - cameraPos).Unit * 1000)
-    local hit = workspace:FindPartOnRayWithIgnoreList(ray, {player.Character})
+    local hit = workspace:FindPartOnRayWithIgnoreList(ray, {self.player.Character})
     return hit == nil or hit:IsDescendantOf(part.Parent)
 end
 
 -- Обновление скелета игрока
-local function updateSkeleton(plr, skeleton)
-    if not ESP_SETTINGS.Enabled then
+function ESP:UpdateSkeleton(plr, skeleton)
+   if not ESP_SETTINGS.Enabled then
         for _, drawing in pairs(skeleton) do
             if drawing then drawing.Visible = false end
         end
@@ -188,55 +208,43 @@ local function updateSkeleton(plr, skeleton)
 end
 
 -- Трекинг игрока
-local function trackPlayer(plr)
-    if plr == player then return end
+function ESP:TrackPlayer(plr)
+    if plr == self.player then return end
     
     local skeleton = {}
-    skeletons[plr] = skeleton
+    self.skeletons[plr] = skeleton
 
     local connection
-    connection = RunService.Heartbeat:Connect(function()
-        updateSkeleton(plr, skeleton)
+    connection = self.RunService.Heartbeat:Connect(function()
+        self:UpdateSkeleton(plr, skeleton)
     end)
 
-    -- Очистка при удалении игрока
     plr.AncestryChanged:Connect(function(_, parent)
         if not parent then
             connection:Disconnect()
-            removeSkeleton(skeleton)
-            skeletons[plr] = nil
+            self:RemoveSkeleton(skeleton)
+            self.skeletons[plr] = nil
         end
     end)
 end
 
--- Включение/выключение ESP
-local function toggleESP(state)
-    ESP_SETTINGS.Enabled = state
-    for plr, skeleton in pairs(skeletons) do
-        updateSkeleton(plr, skeleton)
+-- Управление ESP
+function ESP:Toggle(state)
+    self.ESP_SETTINGS.Enabled = state
+    for plr, skeleton in pairs(self.skeletons) do
+        self:UpdateSkeleton(plr, skeleton)
     end
 end
 
--- Включение/выключение круга головы
-local function toggleHeadCircle(state)
-    ESP_SETTINGS.HeadCircle = state
-    for plr, skeleton in pairs(skeletons) do
-        updateSkeleton(plr, skeleton)
+function ESP:ToggleHeadCircle(state)
+    self.ESP_SETTINGS.HeadCircle = state
+    for plr, skeleton in pairs(self.skeletons) do
+        self:UpdateSkeleton(plr, skeleton)
     end
 end
 
--- Инициализация
-Players.PlayerAdded:Connect(trackPlayer)
-Players.PlayerRemoving:Connect(function(plr)
-    removeSkeleton(skeletons[plr])
-    skeletons[plr] = nil
-end)
+-- Инициализируем ESP
+ESP:Init()
 
-for _, plr in ipairs(Players:GetPlayers()) do
-    trackPlayer(plr)
-end
-
--- Пример использования:
--- toggleESP(true)        -- Включить ESP
--- toggleESP(false)       -- Выключить ESP
--- toggleHeadCircle(true) -- Включить круги вокруг голов
+-- Возвращаем объект ESP для внешнего доступа
+return ESP
