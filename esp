@@ -7,364 +7,389 @@ local Camera = workspace.CurrentCamera
 
 -- Settings
 local ESP_SETTINGS = {
-    MasterSwitch = false,
-    Components = {
-        Skeleton = {
-            Enabled = false,
-            Color = Color3.new(1, 0, 0),
-            Thickness = 2,
-            TeamCheck = false,
-            VisibleOnly = false,
-            HeadCircle = {
-                Enabled = true,
-                BaseSize = 1.5,
-                MinSize = 0.3,
-                Thickness = 2,
-                DynamicSize = true
-            }
-        },
-        Name = {
-            Enabled = false,
-            Color = Color3.new(1, 1, 1),
-            ShowDistance = true,
-            Size = 14,
-            Outline = true,
-            OutlineColor = Color3.new(0, 0, 0),
-            Offset = Vector2.new(0, -30)
-        },
-        Box = {
-            Enabled = false,
-            Color = Color3.new(1, 1, 1),
-            Thickness = 1,
-            TeamCheck = false,
-            VisibleOnly = false,
-            FillTransparency = 1
-        }
-    }
+	MasterSwitch = false,
+	Components = {
+		Skeleton = {
+			Enabled = false,
+			Color = Color3.new(1, 0, 0),
+			Thickness = 2,
+			TeamCheck = false,
+			VisibleOnly = false,
+			HeadCircle = {
+				Enabled = true,
+				BaseSize = 1.5,
+				MinSize = 0.3,
+				Thickness = 2,
+				DynamicSize = true
+			}
+		},
+		Name = {
+			Enabled = false,
+			Color = Color3.new(1, 1, 1),
+			ShowDistance = true,
+			Size = 14,
+			Outline = true,
+			OutlineColor = Color3.new(0, 0, 0),
+			Offset = Vector2.new(0, -30)
+		},
+		Box = {
+			Enabled = false,
+			Color = Color3.new(1, 1, 1),
+			Thickness = 1,
+			TeamCheck = false,
+			VisibleOnly = false,
+			FillTransparency = 1
+		}
+	}
 }
 
 -- Cache
 local LocalPlayer = Players.LocalPlayer
 local Skeletons = {}
 local DrawingCache = {
-    Lines = {},
-    Circles = {},
-    Texts = {},
-    Quads = {}
+	Lines = {},
+	Circles = {},
+	Texts = {},
+	Quads = {}
 }
 
 -- Constants
 local R15_JOINTS = {
-    Head = "Head",
-    UpperTorso = "UpperTorso",
-    LowerTorso = "LowerTorso",
-    LeftUpperArm = "LeftUpperArm",
-    LeftLowerArm = "LeftLowerArm",
-    LeftHand = "LeftHand",
-    RightUpperArm = "RightUpperArm",
-    RightLowerArm = "RightLowerArm",
-    RightHand = "RightHand",
-    LeftUpperLeg = "LeftUpperLeg",
-    LeftLowerLeg = "LeftLowerLeg",
-    RightUpperLeg = "RightUpperLeg",
-    RightLowerLeg = "RightLowerLeg"
+	Head = "Head",
+	UpperTorso = "UpperTorso",
+	LowerTorso = "LowerTorso",
+	LeftUpperArm = "LeftUpperArm",
+	LeftLowerArm = "LeftLowerArm",
+	LeftHand = "LeftHand",
+	RightUpperArm = "RightUpperArm",
+	RightLowerArm = "RightLowerArm",
+	RightHand = "RightHand",
+	LeftUpperLeg = "LeftUpperLeg",
+	LeftLowerLeg = "LeftLowerLeg",
+	RightUpperLeg = "RightUpperLeg",
+	RightLowerLeg = "RightLowerLeg"
 }
 
 local R15_CONNECTIONS = {
-    {"Head", "UpperTorso"},
-    {"UpperTorso", "LowerTorso"},
-    {"UpperTorso", "LeftUpperArm"},
-    {"LeftUpperArm", "LeftLowerArm"},
-    {"LeftLowerArm", "LeftHand"},
-    {"UpperTorso", "RightUpperArm"},
-    {"RightUpperArm", "RightLowerArm"},
-    {"RightLowerArm", "RightHand"},
-    {"LowerTorso", "LeftUpperLeg"},
-    {"LeftUpperLeg", "LeftLowerLeg"},
-    {"LowerTorso", "RightUpperLeg"},
-    {"RightUpperLeg", "RightLowerLeg"}
+	{"Head", "UpperTorso"},
+	{"UpperTorso", "LowerTorso"},
+	{"UpperTorso", "LeftUpperArm"},
+	{"LeftUpperArm", "LeftLowerArm"},
+	{"LeftLowerArm", "LeftHand"},
+	{"UpperTorso", "RightUpperArm"},
+	{"RightUpperArm", "RightLowerArm"},
+	{"RightLowerArm", "RightHand"},
+	{"LowerTorso", "LeftUpperLeg"},
+	{"LeftUpperLeg", "LeftLowerLeg"},
+	{"LowerTorso", "RightUpperLeg"},
+	{"RightUpperLeg", "RightLowerLeg"}
 }
 
 local R6_JOINTS = {
-    Head = "Head",
-    Torso = "Torso",
-    LeftArm = "Left Arm",
-    RightArm = "Right Arm",
-    LeftLeg = "Left Leg",
-    RightLeg = "Right Leg"
+	Head = "Head",
+	Torso = "Torso",
+	LeftArm = "Left Arm",
+	RightArm = "Right Arm",
+	LeftLeg = "Left Leg",
+	RightLeg = "Right Leg"
 }
 
 local R6_CONNECTIONS = {
-    {"Head", "Torso"},
-    {"Torso", "LeftArm"},
-    {"Torso", "RightArm"},
-    {"Torso", "LeftLeg"},
-    {"Torso", "RightLeg"}
+	{"Head", "Torso"},
+	{"Torso", "LeftArm"},
+	{"Torso", "RightArm"},
+	{"Torso", "LeftLeg"},
+	{"Torso", "RightLeg"}
 }
 
 -- Utility functions
 local function CreateDrawingObject(type, properties)
-    local drawing = Drawing.new(type)
-    for prop, value in pairs(properties) do
-        drawing[prop] = value
-    end
-    return drawing
+	local drawing = Drawing.new(type)
+	for prop, value in pairs(properties) do
+		drawing[prop] = value
+	end
+	return drawing
 end
 
 local function GetCachedDrawing(type, key, skeleton, properties)
-    properties = properties or {}
-    properties.Visible = false
-    properties.ZIndex = 10
+	properties = properties or {}
+	properties.Visible = false
+	properties.ZIndex = 10
 
-    if not skeleton[key] then
-        skeleton[key] = CreateDrawingObject(type, properties)
-        DrawingCache[type.."s"][skeleton[key]] = true
-    end
-    return skeleton[key]
+	if not skeleton[key] then
+		skeleton[key] = CreateDrawingObject(type, properties)
+		DrawingCache[type.."s"][skeleton[key]] = true
+	end
+	return skeleton[key]
 end
 
 local function RemoveSkeleton(skeleton)
-    if not skeleton then return end
+	if not skeleton then return end
 
-    for _, drawing in pairs(skeleton) do
-        if drawing and drawing.Remove then
-            DrawingCache[drawing.ClassName][drawing] = nil
-            drawing:Remove()
-        end
-    end
+	for _, drawing in pairs(skeleton) do
+		if drawing and drawing.Remove then
+			DrawingCache[drawing.ClassName][drawing] = nil
+			drawing:Remove()
+		end
+	end
 end
 
 local function ClearComponent(skeleton, pattern)
-    for key, drawing in pairs(skeleton) do
-        if string.find(key, pattern) then
-            if drawing and drawing.Remove then
-                drawing:Remove()
-            end
-            skeleton[key] = nil
-        end
-    end
+	for key, drawing in pairs(skeleton) do
+		if string.find(key, pattern) then
+			if drawing and drawing.Remove then
+				drawing:Remove()
+			end
+			skeleton[key] = nil
+		end
+	end
 end
 
 local function IsPartVisible(part, character)
-    if not part then return false end
-    local cameraPos = Camera.CFrame.Position
-    local ray = Ray.new(cameraPos, (part.Position - cameraPos).Unit * 1000)
-    local hit = workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character})
-    return hit == nil or hit:IsDescendantOf(character)
+	if not part then return false end
+	local cameraPos = Camera.CFrame.Position
+	local ray = Ray.new(cameraPos, (part.Position - cameraPos).Unit * 1000)
+	local hit = workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character})
+	return hit == nil or hit:IsDescendantOf(character)
 end
 
 local function GetPlayerColor(plr, component)
-    local settings = ESP_SETTINGS.Components[component]
-    if settings.TeamCheck and plr.Team then
-        return plr.TeamColor.Color
-    end
-    return settings.Color
+	local settings = ESP_SETTINGS.Components[component]
+	if settings.TeamCheck and plr.Team then
+		return plr.TeamColor.Color
+	end
+	return settings.Color
 end
 
 -- Update functions
 local function UpdateSkeleton(plr, skeleton)
-    if not ESP_SETTINGS.MasterSwitch then
-        RemoveSkeleton(skeleton)
-        return
-    end
+	if not ESP_SETTINGS.MasterSwitch then
+		RemoveSkeleton(skeleton)
+		return
+	end
 
-    local character = plr.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then
-        for _, drawing in pairs(skeleton) do
-            if drawing then drawing.Visible = false end
-        end
-        return
-    end
+	local character = plr.Character
+	if not character or not character:FindFirstChild("HumanoidRootPart") then
+		for _, drawing in pairs(skeleton) do
+			if drawing then drawing.Visible = false end
+		end
+		return
+	end
 
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not humanoid then return end
 
-    -- Skeleton update
-    if ESP_SETTINGS.Components.Skeleton.Enabled then
-        local joints, connections
+	-- Skeleton update
+	if ESP_SETTINGS.Components.Skeleton.Enabled then
+		local joints, connections
 
-        if humanoid.RigType == Enum.HumanoidRigType.R15 then
-            joints = R15_JOINTS
-            connections = R15_CONNECTIONS
-        else
-            joints = R6_JOINTS
-            connections = R6_CONNECTIONS
-        end
+		if humanoid.RigType == Enum.HumanoidRigType.R15 then
+			joints = R15_JOINTS
+			connections = R15_CONNECTIONS
+		else
+			joints = R6_JOINTS
+			connections = R6_CONNECTIONS
+		end
 
-        -- Cache joint objects
-        local jointObjects = {}
-        for name, jointName in pairs(joints) do
-            jointObjects[name] = character:FindFirstChild(jointName)
-        end
+		-- Cache joint objects
+		local jointObjects = {}
+		for name, jointName in pairs(joints) do
+			jointObjects[name] = character:FindFirstChild(jointName)
+		end
 
-        for index, connection in ipairs(connections) do
-            local jointA = jointObjects[connection[1]]
-            local jointB = jointObjects[connection[2]]
-            local lineKey = "line_"..index
+		for index, connection in ipairs(connections) do
+			local jointA = jointObjects[connection[1]]
+			local jointB = jointObjects[connection[2]]
+			local lineKey = "line_"..index
 
-            if jointA and jointB then
-                local posA, onScreenA = Camera:WorldToViewportPoint(jointA.Position)
-                local posB, onScreenB = Camera:WorldToViewportPoint(jointB.Position)
+			if jointA and jointB then
+				local posA, onScreenA = Camera:WorldToViewportPoint(jointA.Position)
+				local posB, onScreenB = Camera:WorldToViewportPoint(jointB.Position)
 
-                local line = GetCachedDrawing("Line", lineKey, skeleton, {
-                    Color = GetPlayerColor(plr, "Skeleton"),
-                    Thickness = ESP_SETTINGS.Components.Skeleton.Thickness
-                })
+				local line = GetCachedDrawing("Line", lineKey, skeleton, {
+					Color = GetPlayerColor(plr, "Skeleton"),
+					Thickness = ESP_SETTINGS.Components.Skeleton.Thickness
+				})
 
-                if onScreenA and onScreenB and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or 
-                    (IsPartVisible(jointA, character) and IsPartVisible(jointB, character))) then
-                    line.From = Vector2.new(posA.X, posA.Y)
-                    line.To = Vector2.new(posB.X, posB.Y)
-                    line.Visible = true
-                else
-                    line.Visible = false
-                end
-            elseif skeleton[lineKey] then
-                skeleton[lineKey].Visible = false
-            end
-        end
+				if onScreenA and onScreenB and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or 
+					(IsPartVisible(jointA, character) and IsPartVisible(jointB, character))) then
+					line.From = Vector2.new(posA.X, posA.Y)
+					line.To = Vector2.new(posB.X, posB.Y)
+					line.Visible = true
+				else
+					line.Visible = false
+				end
+			elseif skeleton[lineKey] then
+				skeleton[lineKey].Visible = false
+			end
+		end
 
-        -- Head circle
-        if ESP_SETTINGS.Components.Skeleton.HeadCircle.Enabled then
-            local head = jointObjects.Head
-            if head then
-                local headPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-                local distance = (head.Position - Camera.CFrame.Position).Magnitude
+		-- Head circle
+		if ESP_SETTINGS.Components.Skeleton.HeadCircle.Enabled then
+			local head = jointObjects.Head
+			if head then
+				local headPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+				local distance = (head.Position - Camera.CFrame.Position).Magnitude
 
-                local headCircle = GetCachedDrawing("Circle", "headCircle", skeleton, {
-                    Color = GetPlayerColor(plr, "Skeleton"),
-                    Thickness = ESP_SETTINGS.Components.Skeleton.HeadCircle.Thickness,
-                    Filled = false
-                })
+				local headCircle = GetCachedDrawing("Circle", "headCircle", skeleton, {
+					Color = GetPlayerColor(plr, "Skeleton"),
+					Thickness = ESP_SETTINGS.Components.Skeleton.HeadCircle.Thickness,
+					Filled = false
+				})
 
-                if ESP_SETTINGS.Components.Skeleton.HeadCircle.DynamicSize then
-                    local size = ESP_SETTINGS.Components.Skeleton.HeadCircle.BaseSize / (distance * 0.1)
-                    headCircle.Radius = math.max(size, ESP_SETTINGS.Components.Skeleton.HeadCircle.MinSize)
-                else
-                    headCircle.Radius = 8
-                end
+				if ESP_SETTINGS.Components.Skeleton.HeadCircle.DynamicSize then
+					local size = ESP_SETTINGS.Components.Skeleton.HeadCircle.BaseSize / (distance * 0.1)
+					headCircle.Radius = math.max(size, ESP_SETTINGS.Components.Skeleton.HeadCircle.MinSize)
+				else
+					headCircle.Radius = 8
+				end
 
-                if onScreen and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or IsPartVisible(head, character)) then
-                    headCircle.Position = Vector2.new(headPos.X, headPos.Y)
-                    headCircle.Visible = true
-                else
-                    headCircle.Visible = false
-                end
-            end
-        else
-            if skeleton.headCircle then
-                skeleton.headCircle.Visible = false
-            end
-        end
-    else
-        ClearComponent(skeleton, "line_")
-        if skeleton.headCircle then
-            skeleton.headCircle.Visible = false
-        end
-    end
+				if onScreen and (not ESP_SETTINGS.Components.Skeleton.VisibleOnly or IsPartVisible(head, character)) then
+					headCircle.Position = Vector2.new(headPos.X, headPos.Y)
+					headCircle.Visible = true
+				else
+					headCircle.Visible = false
+				end
+			end
+		else
+			if skeleton.headCircle then
+				skeleton.headCircle.Visible = false
+			end
+		end
+	else
+		ClearComponent(skeleton, "line_")
+		if skeleton.headCircle then
+			skeleton.headCircle.Visible = false
+		end
+	end
 
-    -- Name and distance
-    if ESP_SETTINGS.Components.Name.Enabled then
-        local head = character:FindFirstChild("Head")
-        if head then
-            local headPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+	-- Name and distance
+	if ESP_SETTINGS.Components.Name.Enabled then
+		local head = character:FindFirstChild("Head")
+		if head then
+			local headPos, onScreen = Camera:WorldToViewportPoint(head.Position)
 
-            local nameText = GetCachedDrawing("Text", "nameText", skeleton, {
-                Color = GetPlayerColor(plr, "Name"),
-                Size = ESP_SETTINGS.Components.Name.Size,
-                Outline = ESP_SETTINGS.Components.Name.Outline,
-                OutlineColor = ESP_SETTINGS.Components.Name.OutlineColor,
-                Center = true
-            })
+			local nameText = GetCachedDrawing("Text", "nameText", skeleton, {
+				Color = GetPlayerColor(plr, "Name"),
+				Size = ESP_SETTINGS.Components.Name.Size,
+				Outline = ESP_SETTINGS.Components.Name.Outline,
+				OutlineColor = ESP_SETTINGS.Components.Name.OutlineColor,
+				Center = true
+			})
 
-            local distanceText = ""
-            if ESP_SETTINGS.Components.Name.ShowDistance then
-                local distance = (head.Position - Camera.CFrame.Position).Magnitude
-                distanceText = string.format(" [%d]", math.floor(distance))
-            end
+			local distanceText = ""
+			if ESP_SETTINGS.Components.Name.ShowDistance then
+				local distance = (head.Position - Camera.CFrame.Position).Magnitude
+				distanceText = string.format(" [%d]", math.floor(distance))
+			end
 
-            nameText.Text = plr.Name .. distanceText
+			nameText.Text = plr.Name .. distanceText
 
-            if onScreen then
-                nameText.Position = Vector2.new(
-                    headPos.X + ESP_SETTINGS.Components.Name.Offset.X,
-                    headPos.Y + ESP_SETTINGS.Components.Name.Offset.Y
-                )
-                nameText.Visible = true
-            else
-                nameText.Visible = false
-            end
-        end
-    else
-        if skeleton.nameText then
-            skeleton.nameText.Visible = false
-        end
-    end
+			if onScreen then
+				nameText.Position = Vector2.new(
+					headPos.X + ESP_SETTINGS.Components.Name.Offset.X,
+					headPos.Y + ESP_SETTINGS.Components.Name.Offset.Y
+				)
+				nameText.Visible = true
+			else
+				nameText.Visible = false
+			end
+		end
+	else
+		if skeleton.nameText then
+			skeleton.nameText.Visible = false
+		end
+	end
 
-    -- Box ESP
-    if ESP_SETTINGS.Components.Box.Enabled then
-        -- (Keep your existing box ESP implementation here)
-    else
-        ClearComponent(skeleton, "box3d_line_")
-    end
+	-- Box ESP
+	if ESP_SETTINGS.Components.Box.Enabled then
+		-- (Keep your existing box ESP implementation here)
+	else
+		ClearComponent(skeleton, "box3d_line_")
+	end
 end
 
 -- Player tracking
 local function TrackPlayer(plr)
-    if plr == LocalPlayer then return end
+	if plr == LocalPlayer then return end
 
-    local skeleton = {}
-    Skeletons[plr] = skeleton
+	local skeleton = {}
+	Skeletons[plr] = skeleton
 
-    local connection
-    connection = RunService.Heartbeat:Connect(function()
-        UpdateSkeleton(plr, skeleton)
-    end)
+	local connection
+	connection = RunService.Heartbeat:Connect(function()
+		UpdateSkeleton(plr, skeleton)
+	end)
 
-    plr.AncestryChanged:Connect(function(_, parent)
-        if not parent then
-            connection:Disconnect()
-            RemoveSkeleton(skeleton)
-            Skeletons[plr] = nil
-        end
-    end)
+	plr.AncestryChanged:Connect(function(_, parent)
+		if not parent then
+			connection:Disconnect()
+			RemoveSkeleton(skeleton)
+			Skeletons[plr] = nil
+		end
+	end)
 
-    plr.CharacterRemoving:Connect(function()
-        RemoveSkeleton(skeleton)
-    end)
+	plr.CharacterRemoving:Connect(function()
+		RemoveSkeleton(skeleton)
+	end)
 end
 
 -- API
 function ESP:ToggleMaster(state)
-    ESP_SETTINGS.MasterSwitch = state
-    if not state then
-        for _, skeleton in pairs(Skeletons) do
-            RemoveSkeleton(skeleton)
-        end
-    end
+	ESP_SETTINGS.MasterSwitch = state
+	if not state then
+		for _, skeleton in pairs(Skeletons) do
+			RemoveSkeleton(skeleton)
+		end
+	end
 end
 
 function ESP:ToggleSkeleton(state)
-    ESP_SETTINGS.Components.Skeleton.Enabled = state
+	ESP_SETTINGS.Components.Skeleton.Enabled = state
 end
 
 function ESP:ToggleNames(state)
-    ESP_SETTINGS.Components.Name.Enabled = state
+	ESP_SETTINGS.Components.Name.Enabled = state
 end
 
 function ESP:ToggleBox(state)
-    ESP_SETTINGS.Components.Box.Enabled = state
+	ESP_SETTINGS.Components.Box.Enabled = state
 end
+
+setmetatable(ESP, {
+	__index = function(t, k)
+		if k == "Enabled" then
+			return ESP_SETTINGS.MasterSwitch
+		elseif k == "SkeletonEnabled" then
+			return ESP_SETTINGS.Components.Skeleton.Enabled
+		elseif k == "NamesEnabled" then
+			return ESP_SETTINGS.Components.Name.Enabled
+		elseif k == "BoxEnabled" then
+			return ESP_SETTINGS.Components.Box.Enabled
+		end
+	end,
+	__newindex = function(t, k, v)
+		if k == "Enabled" then
+			ESP:ToggleMaster(v)
+		elseif k == "SkeletonEnabled" then
+			ESP:ToggleSkeleton(v)
+		elseif k == "NamesEnabled" then
+			ESP:ToggleNames(v)
+		elseif k == "BoxEnabled" then
+			ESP:ToggleBox(v)
+		end
+	end
+})
 
 -- Initialization
 Players.PlayerAdded:Connect(TrackPlayer)
 Players.PlayerRemoving:Connect(function(plr)
-    RemoveSkeleton(Skeletons[plr])
-    Skeletons[plr] = nil
+	RemoveSkeleton(Skeletons[plr])
+	Skeletons[plr] = nil
 end)
 
 for _, plr in ipairs(Players:GetPlayers()) do
-    TrackPlayer(plr)
+	TrackPlayer(plr)
 end
 
 return ESP
